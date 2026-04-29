@@ -1,0 +1,66 @@
+type: operational
+name: aegis_kg
+purpose: Phase 1 Regulatory Reference Knowledge Graph
+description: |
+  Canonical, case-agnostic regulatory knowledge foundation.
+  Encodes 5 EU regulations (GDPR, CRA, NIS 2, DORA, AI Act) with articles, clauses,
+  domains, and sub-domains (10x38 taxonomy).
+  NOT case-specific — Phase 2/3 data lives in 02_CASES/<case>/
+
+neo4j:
+  uri: bolt://localhost:7687
+  database: neo4j
+  isolation: label_based
+
+api:
+  port: 5000
+  base_url: http://localhost:5000
+
+contains:
+  node_labels:
+    - Regulation
+    - Article
+    - Clause
+    - Domain
+    - SubDomain
+    - ComplementarityAnalysis
+
+excludes:
+  node_labels:
+    - D3FEND
+    - CAPEC
+    - CWE
+    - Attack
+    - AttackGroup
+    - AttackMitigation
+    - ATLAS
+    - AtlasTactic
+    - AtlasMitigation
+    - Framework
+    - FrameworkCategory
+    - FrameworkControl
+
+redirect_rules:
+  - condition: "D3FEND, CAPEC, CWE, ATT&CK, ATLAS, Attack, Threat"
+    redirect_to: threat_modeling_kg
+  - condition: "NIST CSF, ISO 27001, FrameworkControl"
+    redirect_to: compliance_mapping_kg
+  - condition: "cross-KG aggregation"
+    redirect_to: kg_portal
+  - condition: "create new KG"
+    action: STOP_and_consult_KG_MANIFEST
+
+operations:
+  read: allowed_via_api_or_cypher
+  write: etl_scripts_only  # Only via ETL scripts in etl/ directory
+  schema_modification: requires_KG_MANIFEST_update
+
+agent_prompt: |
+  Before operating on this KG, confirm:
+  1. Your query involves ONLY: Regulation, Article, Clause, Domain, SubDomain
+  2. If you need D3FEND/CAPEC/CWE/ATT&CK/ATLAS → use threat_modeling_kg
+  3. If you need NIST/ISO/Framework controls → use compliance_mapping_kg
+  4. If you need cross-KG view → use kg_portal (port 8080)
+  5. If you want to create new node types or new KG → STOP and consult KG_MANIFEST.md
+
+  NEVER run raw Cypher that joins with other KG labels.

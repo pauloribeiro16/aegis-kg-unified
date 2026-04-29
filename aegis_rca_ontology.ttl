@@ -1,0 +1,2530 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix aegis: <https://aegis.arm-methodology.eu/ontology#> .
+@prefix rca:   <https://aegis.arm-methodology.eu/rca#> .
+
+# ============================================================
+# ONTOLOGY DECLARATION
+# ============================================================
+
+<https://aegis.arm-methodology.eu/ontology>
+    a owl:Ontology ;
+    rdfs:label "AEGIS Regulatory Complementarity Analysis Ontology"@en ;
+    rdfs:comment """
+        Ontology for the Regulatory Complementarity Analysis sub-module of the 
+        ARM (Adaptive Risk Management) Methodology.
+        
+        v2.0 additions (merged from 06_Clause_Mapping_Matrix.ods):
+        - New data properties on aegis:Clause: justification, relevance, companyContextRef
+        - New class aegis:ApplicabilityCondition: formal applicability criteria per regulation
+        - New class aegis:ComplementarityPair: pairwise Jaccard metrics for all 10 regulation pairs
+        - New class aegis:StrategicTension: typed conflicts with severity and resolution patterns
+        - New class aegis:SubDomainMetrics: pre-computed NI aggregates per sub-domain
+        - New named individual rca:Relevance values (HIGH, MEDIUM, LOW)
+        
+        Captures five EU cybersecurity regulations (GDPR, CRA, NIS 2, DORA, AI Act),
+        decomposed into 150 atomic normative clauses, mapped onto a common taxonomy
+        of 10 Security Control Domains and 38 Sub-Domains.
+        
+        Adapted from: Ferreira, A.L. (2016). Doctoral Thesis, University of Minho.
+        ARM Methodology: Ribeiro, P. (in progress). Doctoral Thesis, University of Minho.
+    """@en ;
+    owl:versionInfo "2.0.0" .
+
+
+# ============================================================
+# SECTION 1 — CLASSES
+# ============================================================
+
+# --- Core taxonomy ---
+
+aegis:Domain a owl:Class ;
+    rdfs:label "Security Control Domain"@en ;
+    rdfs:comment "Top-level grouping of security control concerns (D-01 through D-10)."@en .
+
+aegis:SubDomain a owl:Class ;
+    rdfs:label "Security Control Sub-Domain"@en ;
+    rdfs:comment "Atomic implementable control area within a Domain (38 total)."@en .
+
+# --- Regulatory entities ---
+
+aegis:Regulation a owl:Class ;
+    rdfs:label "Regulation"@en ;
+    rdfs:comment "A European Union legal instrument imposing binding cybersecurity obligations."@en .
+
+aegis:Clause a owl:Class ;
+    rdfs:label "Regulatory Clause"@en ;
+    rdfs:comment """Atomic normative statement extracted from a Regulation, satisfying the 
+    ARM atomicity criteria (single sub-domain, single obligationType, single obligatedParty)."""@en .
+
+# --- Obligation value types ---
+
+aegis:ObligationType a owl:Class ;
+    rdfs:label "Obligation Type"@en ;
+    rdfs:comment "Temporal activation pattern of a normative obligation."@en .
+
+aegis:ObligatedParty a owl:Class ;
+    rdfs:label "Obligated Party"@en ;
+    rdfs:comment "Legal actor upon whom a clause imposes a direct obligation."@en .
+
+aegis:NormativeStrength a owl:Class ;
+    rdfs:label "Normative Strength"@en ;
+    rdfs:comment "Categorical weight of the normative language (Weight 1/2/3 from Matrix B2)."@en .
+
+aegis:Relevance a owl:Class ;
+    rdfs:label "Relevance"@en ;
+    rdfs:comment "Contextual relevance of a clause for a given company profile (HIGH / MEDIUM / LOW)."@en .
+
+aegis:ApplicabilityCondition a owl:Class ;
+    rdfs:label "Applicability Condition"@en ;
+    rdfs:comment """Formal criterion determining whether a Regulation applies to a given company context.
+    Captures the field name, threshold, and observed value from the Company Context Assessment (Phase 1, Step A)."""@en .
+
+aegis:ComplementarityPair a owl:Class ;
+    rdfs:label "Complementarity Pair"@en ;
+    rdfs:comment """Pairwise complementarity analysis between two Regulations.
+    Stores the Jaccard Shared Scope (M1), intersection and union sub-domain counts, and qualitative interpretation.
+    Adapted from Ferreira (2016), metric M1."""@en .
+
+aegis:StrategicTension a owl:Class ;
+    rdfs:label "Strategic Tension"@en ;
+    rdfs:comment """A identified conflict or misalignment between obligations from two or more Regulations
+    on the same Sub-Domain. May be Structural (permanent, design-level) or Contextual (conditional on 
+    a compound event simultaneously triggering multiple regulatory triggers)."""@en .
+
+aegis:SubDomainMetrics a owl:Class ;
+    rdfs:label "Sub-Domain Metrics"@en ;
+    rdfs:comment "Pre-computed normative intensity aggregates for a Sub-Domain across all applicable regulations."@en .
+
+
+# ============================================================
+# SECTION 2 — OBJECT PROPERTIES
+# ============================================================
+
+aegis:hasPart a owl:ObjectProperty ;
+    rdfs:label "has part"@en ;
+    rdfs:domain aegis:Domain ;
+    rdfs:range aegis:SubDomain ;
+    rdfs:comment "A Domain contains one or more Sub-Domains."@en .
+
+aegis:partOf a owl:ObjectProperty ;
+    owl:inverseOf aegis:hasPart ;
+    rdfs:label "part of"@en ;
+    rdfs:domain aegis:SubDomain ;
+    rdfs:range aegis:Domain .
+
+aegis:hasClauses a owl:ObjectProperty ;
+    rdfs:label "has clauses"@en ;
+    rdfs:domain aegis:Regulation ;
+    rdfs:range aegis:Clause ;
+    rdfs:comment "A Regulation decomposes into one or more atomic Clauses."@en .
+
+aegis:clauseOf a owl:ObjectProperty ;
+    owl:inverseOf aegis:hasClauses ;
+    rdfs:label "clause of"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:Regulation .
+
+aegis:mappedTo a owl:ObjectProperty ;
+    rdfs:label "mapped to"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:SubDomain ;
+    rdfs:comment "A Clause is mapped to exactly one Sub-Domain (atomicity constraint)."@en .
+
+aegis:covers a owl:ObjectProperty ;
+    rdfs:label "covers"@en ;
+    rdfs:domain aegis:Regulation ;
+    rdfs:range aegis:SubDomain ;
+    rdfs:comment "A Regulation covers a Sub-Domain if it has at least one Clause mapped to it."@en .
+
+aegis:hasObligationType a owl:ObjectProperty ;
+    rdfs:label "has obligation type"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:ObligationType .
+
+aegis:hasObligatedParty a owl:ObjectProperty ;
+    rdfs:label "has obligated party"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:ObligatedParty .
+
+aegis:hasNormativeStrength a owl:ObjectProperty ;
+    rdfs:label "has normative strength"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:NormativeStrength .
+
+rca:hasTensionWith a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "has tension with"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:Clause ;
+    rdfs:comment "Two Clauses in different Regulations that impose conflicting obligations on the same Sub-Domain."@en .
+
+aegis:hasRelevance a owl:ObjectProperty ;
+    rdfs:label "has relevance"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range aegis:Relevance ;
+    rdfs:comment "Contextual relevance level of a clause for a given company profile."@en .
+
+aegis:hasApplicabilityCondition a owl:ObjectProperty ;
+    rdfs:label "has applicability condition"@en ;
+    rdfs:domain aegis:Regulation ;
+    rdfs:range aegis:ApplicabilityCondition ;
+    rdfs:comment "Links a Regulation to the formal conditions that determine its applicability."@en .
+
+aegis:comparesRegulationA a owl:ObjectProperty ;
+    rdfs:label "compares regulation A"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range aegis:Regulation .
+
+aegis:comparesRegulationB a owl:ObjectProperty ;
+    rdfs:label "compares regulation B"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range aegis:Regulation .
+
+aegis:involvesRegulation a owl:ObjectProperty ;
+    rdfs:label "involves regulation"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range aegis:Regulation .
+
+aegis:affectsSubDomain a owl:ObjectProperty ;
+    rdfs:label "affects sub-domain"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range aegis:SubDomain .
+
+aegis:involvesClauses a owl:ObjectProperty ;
+    rdfs:label "involves clauses"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range aegis:Clause .
+
+aegis:hasMetrics a owl:ObjectProperty ;
+    rdfs:label "has metrics"@en ;
+    rdfs:domain aegis:SubDomain ;
+    rdfs:range aegis:SubDomainMetrics .
+
+
+# ============================================================
+# SECTION 3 — DATA PROPERTIES
+# ============================================================
+
+aegis:domainId a owl:DatatypeProperty ;
+    rdfs:label "domain ID"@en ;
+    rdfs:domain aegis:Domain ;
+    rdfs:range xsd:string .
+
+aegis:subDomainId a owl:DatatypeProperty ;
+    rdfs:label "sub-domain ID"@en ;
+    rdfs:domain aegis:SubDomain ;
+    rdfs:range xsd:string .
+
+aegis:clauseId a owl:DatatypeProperty ;
+    rdfs:label "clause ID"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range xsd:string .
+
+aegis:articleReference a owl:DatatypeProperty ;
+    rdfs:label "article reference"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range xsd:string .
+
+aegis:description a owl:DatatypeProperty ;
+    rdfs:label "description"@en ;
+    rdfs:range xsd:string .
+
+aegis:regulationId a owl:DatatypeProperty ;
+    rdfs:label "regulation ID"@en ;
+    rdfs:domain aegis:Regulation ;
+    rdfs:range xsd:string .
+
+aegis:euReference a owl:DatatypeProperty ;
+    rdfs:label "EU official reference"@en ;
+    rdfs:domain aegis:Regulation ;
+    rdfs:range xsd:string .
+
+# --- New data properties (v2.0) ---
+
+aegis:justification a owl:DatatypeProperty ;
+    rdfs:label "justification"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Short rationale explaining why this clause is relevant in the given company context."@en .
+
+aegis:companyContextRef a owl:DatatypeProperty ;
+    rdfs:label "company context reference"@en ;
+    rdfs:domain aegis:Clause ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Reference to the Company Context Assessment question (Qnn) that activates this clause."@en .
+
+aegis:applicabilityField a owl:DatatypeProperty ;
+    rdfs:label "applicability field"@en ;
+    rdfs:domain aegis:ApplicabilityCondition ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The company context field evaluated (e.g. 'processes_personal_data', 'size_employees')."@en .
+
+aegis:threshold a owl:DatatypeProperty ;
+    rdfs:label "threshold"@en ;
+    rdfs:domain aegis:ApplicabilityCondition ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The threshold or criterion that must be met for the regulation to apply."@en .
+
+aegis:conditionMet a owl:DatatypeProperty ;
+    rdfs:label "condition met"@en ;
+    rdfs:domain aegis:ApplicabilityCondition ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment "Whether this applicability condition is satisfied in the assessed company context."@en .
+
+aegis:applicabilityStatus a owl:DatatypeProperty ;
+    rdfs:label "applicability status"@en ;
+    rdfs:domain aegis:ApplicabilityCondition ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Outcome: APPLICABLE or NOT_APPLICABLE."@en .
+
+aegis:jaccardIndex a owl:DatatypeProperty ;
+    rdfs:label "Jaccard index"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Shared Scope (M1): |D(Ra) ∩ D(Rb)| / |D(Ra) ∪ D(Rb)|. Adapted from Ferreira (2016)."@en .
+
+aegis:intersectionCount a owl:DatatypeProperty ;
+    rdfs:label "intersection count"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Number of sub-domains covered by both regulations."@en .
+
+aegis:unionCount a owl:DatatypeProperty ;
+    rdfs:label "union count"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Number of sub-domains covered by at least one of the two regulations."@en .
+
+aegis:complementarityIndex a owl:DatatypeProperty ;
+    rdfs:label "complementarity index"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "1 - jaccardIndex. Higher values indicate more complementary (non-overlapping) scope."@en .
+
+aegis:pairInterpretation a owl:DatatypeProperty ;
+    rdfs:label "pair interpretation"@en ;
+    rdfs:domain aegis:ComplementarityPair ;
+    rdfs:range xsd:string .
+
+aegis:tensionId a owl:DatatypeProperty ;
+    rdfs:label "tension ID"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range xsd:string .
+
+aegis:tensionType a owl:DatatypeProperty ;
+    rdfs:label "tension type"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Type: TIMING_MISMATCH | RETENTION_CONFLICT | TRIGGER_MISMATCH | ALIGNMENT_OPPORTUNITY."@en .
+
+aegis:tensionScope a owl:DatatypeProperty ;
+    rdfs:label "tension scope"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range xsd:string ;
+    rdfs:comment "STRUCTURAL (permanent, design-level) or CONTEXTUAL (conditional on compound event)."@en .
+
+aegis:severity a owl:DatatypeProperty ;
+    rdfs:label "severity"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range xsd:string ;
+    rdfs:comment "CRITICAL | HIGH | MEDIUM | LOW."@en .
+
+aegis:resolutionPattern a owl:DatatypeProperty ;
+    rdfs:label "resolution pattern"@en ;
+    rdfs:domain aegis:StrategicTension ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Architectural pattern that resolves the tension (e.g. Max-SLA Routing, Cryptographic Sharding)."@en .
+
+aegis:maxNI a owl:DatatypeProperty ;
+    rdfs:label "max normative intensity"@en ;
+    rdfs:domain aegis:SubDomainMetrics ;
+    rdfs:range xsd:decimal .
+
+aegis:minNI a owl:DatatypeProperty ;
+    rdfs:label "min normative intensity"@en ;
+    rdfs:domain aegis:SubDomainMetrics ;
+    rdfs:range xsd:decimal .
+
+aegis:avgNI a owl:DatatypeProperty ;
+    rdfs:label "average normative intensity"@en ;
+    rdfs:domain aegis:SubDomainMetrics ;
+    rdfs:range xsd:decimal .
+
+aegis:dominantObligationType a owl:DatatypeProperty ;
+    rdfs:label "dominant obligation type"@en ;
+    rdfs:domain aegis:SubDomainMetrics ;
+    rdfs:range xsd:string .
+
+aegis:totalClauseCount a owl:DatatypeProperty ;
+    rdfs:label "total clause count"@en ;
+    rdfs:domain aegis:SubDomainMetrics ;
+    rdfs:range xsd:integer .
+
+
+# ============================================================
+# SECTION 4 — NAMED INDIVIDUALS: ObligationType
+# ============================================================
+
+rca:CONTINUOUS a aegis:ObligationType ;
+    rdfs:label "Continuous"@en ;
+    rdfs:comment "Obligation persists throughout the entire operational period."@en .
+
+rca:TRIGGERED a aegis:ObligationType ;
+    rdfs:label "Triggered"@en ;
+    rdfs:comment "Obligation activates upon occurrence of a specific event (e.g. breach, request)."@en .
+
+rca:ONE_TIME a aegis:ObligationType ;
+    rdfs:label "One-time"@en ;
+    rdfs:comment "Obligation must be fulfilled once, typically prior to market placement or processing start."@en .
+
+rca:PERIODIC a aegis:ObligationType ;
+    rdfs:label "Periodic"@en ;
+    rdfs:comment "Obligation recurs at defined intervals (annually, regularly, as scheduled)."@en .
+
+
+# ============================================================
+# SECTION 5 — NAMED INDIVIDUALS: ObligatedParty
+# ============================================================
+
+rca:CONTROLLER a aegis:ObligatedParty ;
+    rdfs:label "Controller"@en ;
+    rdfs:comment "GDPR data controller: entity that determines purposes and means of personal data processing."@en .
+
+rca:MANUFACTURER a aegis:ObligatedParty ;
+    rdfs:label "Manufacturer"@en ;
+    rdfs:comment "CRA manufacturer: entity that designs, develops and places products with digital elements on the EU market."@en .
+
+rca:ESSENTIAL_OR_IMPORTANT_ENTITY a aegis:ObligatedParty ;
+    rdfs:label "Essential or Important Entity"@en ;
+    rdfs:comment "NIS 2 entity: organisation classified as essential or important under Art. 3 of NIS 2 Directive."@en .
+
+rca:FINANCIAL_ENTITY a aegis:ObligatedParty ;
+    rdfs:label "Financial Entity"@en ;
+    rdfs:comment "DORA financial entity: credit institution, insurance undertaking, investment firm and other entities per Art. 2 DORA."@en .
+
+rca:PROVIDER a aegis:ObligatedParty ;
+    rdfs:label "Provider"@en ;
+    rdfs:comment "AI Act provider: entity that develops or has a high-risk AI system developed and places it on the market."@en .
+
+rca:DEPLOYER a aegis:ObligatedParty ;
+    rdfs:label "Deployer"@en ;
+    rdfs:comment "AI Act deployer: entity that uses a high-risk AI system under its authority."@en .
+
+
+# ============================================================
+# SECTION 6 — NAMED INDIVIDUALS: NormativeStrength
+# ============================================================
+
+rca:Weight1 a aegis:NormativeStrength ;
+    rdfs:label "Weight 1 — Conditional"@en ;
+    rdfs:comment "Conditional language: 'where appropriate', 'if applicable', 'as necessary'. Obligation applies subject to context."@en .
+
+rca:Weight2 a aegis:NormativeStrength ;
+    rdfs:label "Weight 2 — Unconditional-Flexible"@en ;
+    rdfs:comment "Unconditional but flexible language: 'shall', 'must' without specific technical prescriptions."@en .
+
+rca:Weight3 a aegis:NormativeStrength ;
+    rdfs:label "Weight 3 — Unconditional-Specific"@en ;
+    rdfs:comment "Unconditional and technically specific: 'shall' with named control (MFA, 72h deadline, SBOM)."@en .
+
+
+# ============================================================
+# SECTION 7 — NAMED INDIVIDUALS: Relevance
+# ============================================================
+
+rca:HIGH a aegis:Relevance ;
+    rdfs:label "High Relevance"@en ;
+    rdfs:comment "Clause is directly and fully applicable to the company context with no conditions."@en .
+
+rca:MEDIUM a aegis:Relevance ;
+    rdfs:label "Medium Relevance"@en ;
+    rdfs:comment "Clause is applicable but with lower priority or partial scope in the company context."@en .
+
+rca:LOW a aegis:Relevance ;
+    rdfs:label "Low Relevance"@en ;
+    rdfs:comment "Clause applies only under specific edge-case conditions in the company context."@en .
+
+
+# ============================================================
+# SECTION 8 — NAMED INDIVIDUALS: Regulations
+# ============================================================
+
+rca:GDPR a aegis:Regulation ;
+    aegis:regulationId "GDPR" ;
+    aegis:euReference "Regulation (EU) 2016/679" ;
+    rdfs:label "General Data Protection Regulation"@en ;
+    aegis:description "EU Regulation on the protection of natural persons with regard to the processing of personal data and the free movement of such data."@en .
+
+rca:CRA a aegis:Regulation ;
+    aegis:regulationId "CRA" ;
+    aegis:euReference "Regulation (EU) 2024/2847" ;
+    rdfs:label "Cyber Resilience Act"@en ;
+    aegis:description "EU Regulation on horizontal cybersecurity requirements for products with digital elements."@en .
+
+rca:NIS2 a aegis:Regulation ;
+    aegis:regulationId "NIS2" ;
+    aegis:euReference "Directive (EU) 2022/2555" ;
+    rdfs:label "Network and Information Security Directive 2"@en ;
+    aegis:description "EU Directive on measures for a high common level of cybersecurity across the Union."@en .
+
+rca:DORA a aegis:Regulation ;
+    aegis:regulationId "DORA" ;
+    aegis:euReference "Regulation (EU) 2022/2554" ;
+    rdfs:label "Digital Operational Resilience Act"@en ;
+    aegis:description "EU Regulation on digital operational resilience for the financial sector."@en .
+
+rca:AIAct a aegis:Regulation ;
+    aegis:regulationId "AIAct" ;
+    aegis:euReference "Regulation (EU) 2024/1689" ;
+    rdfs:label "EU Artificial Intelligence Act"@en ;
+    aegis:description "EU Regulation laying down harmonised rules on artificial intelligence."@en .
+
+
+# ============================================================
+# SECTION 8 — NAMED INDIVIDUALS: Domains (D-01 through D-10)
+# ============================================================
+
+rca:D-01 a aegis:Domain ;
+    aegis:domainId "D-01" ;
+    rdfs:label "Cryptography"@en ;
+    aegis:description "Data at rest, in transit, key management, and integrity mechanisms."@en .
+
+rca:D-02 a aegis:Domain ;
+    aegis:domainId "D-02" ;
+    rdfs:label "Vulnerability Management"@en ;
+    aegis:description "Identification, patching, coordinated disclosure, and penetration testing."@en .
+
+rca:D-03 a aegis:Domain ;
+    aegis:domainId "D-03" ;
+    rdfs:label "Access Control"@en ;
+    aegis:description "Identity lifecycle, MFA, least privilege, and secure system defaults."@en .
+
+rca:D-04 a aegis:Domain ;
+    aegis:domainId "D-04" ;
+    rdfs:label "Incident Management"@en ;
+    aegis:description "Detection, containment, regulatory notification, and recovery."@en .
+
+rca:D-05 a aegis:Domain ;
+    aegis:domainId "D-05" ;
+    rdfs:label "Data Lifecycle"@en ;
+    aegis:description "Minimization, retention, erasure, and portability."@en .
+
+rca:D-06 a aegis:Domain ;
+    aegis:domainId "D-06" ;
+    rdfs:label "Supply Chain Security"@en ;
+    aegis:description "Vendor assessment, SBOM, contractual obligations, and boundary management."@en .
+
+rca:D-07 a aegis:Domain ;
+    aegis:domainId "D-07" ;
+    rdfs:label "Secure Development"@en ;
+    aegis:description "Secure-by-design, coding practices, CI/CD pipeline security, and change management."@en .
+
+rca:D-08 a aegis:Domain ;
+    aegis:domainId "D-08" ;
+    rdfs:label "Governance and Awareness"@en ;
+    aegis:description "General awareness, role-specific competence, and board-level training."@en .
+
+rca:D-09 a aegis:Domain ;
+    aegis:domainId "D-09" ;
+    rdfs:label "Risk and Impact Assessment"@en ;
+    aegis:description "Policies, assessments, asset inventories, and records of processing."@en .
+
+rca:D-10 a aegis:Domain ;
+    aegis:domainId "D-10" ;
+    rdfs:label "Monitoring and Audit"@en ;
+    aegis:description "Continuous monitoring, audit logging, and compliance testing."@en .
+
+
+# ============================================================
+# SECTION 9 — NAMED INDIVIDUALS: Sub-Domains (38 total)
+# ============================================================
+
+# D-01
+
+rca:D-01-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-01.1" ;
+    rdfs:label "Data at Rest Encryption"@en ;
+    aegis:partOf rca:D-01 .
+
+rca:D-01-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-01.2" ;
+    rdfs:label "Data in Transit Encryption"@en ;
+    aegis:partOf rca:D-01 .
+
+rca:D-01-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-01.3" ;
+    rdfs:label "Cryptographic Key Management"@en ;
+    aegis:partOf rca:D-01 .
+
+rca:D-01-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-01.4" ;
+    rdfs:label "Data Integrity Mechanisms"@en ;
+    aegis:partOf rca:D-01 .
+
+# D-02
+
+rca:D-02-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-02.1" ;
+    rdfs:label "Vulnerability Identification"@en ;
+    aegis:partOf rca:D-02 .
+
+rca:D-02-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-02.2" ;
+    rdfs:label "Patch Management and Updates"@en ;
+    aegis:partOf rca:D-02 .
+
+rca:D-02-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-02.3" ;
+    rdfs:label "Coordinated Vulnerability Disclosure"@en ;
+    aegis:partOf rca:D-02 .
+
+rca:D-02-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-02.4" ;
+    rdfs:label "Threat-Led Penetration Testing"@en ;
+    aegis:partOf rca:D-02 .
+
+# D-03
+
+rca:D-03-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-03.1" ;
+    rdfs:label "Identity Lifecycle Management"@en ;
+    aegis:partOf rca:D-03 .
+
+rca:D-03-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-03.2" ;
+    rdfs:label "Multi-Factor Authentication"@en ;
+    aegis:partOf rca:D-03 .
+
+rca:D-03-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-03.3" ;
+    rdfs:label "Authorization and Least Privilege"@en ;
+    aegis:partOf rca:D-03 .
+
+rca:D-03-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-03.4" ;
+    rdfs:label "Secure System Defaults"@en ;
+    aegis:partOf rca:D-03 .
+
+# D-04
+
+rca:D-04-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-04.1" ;
+    rdfs:label "Incident Detection and Triage"@en ;
+    aegis:partOf rca:D-04 .
+
+rca:D-04-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-04.2" ;
+    rdfs:label "Containment and Mitigation"@en ;
+    aegis:partOf rca:D-04 .
+
+rca:D-04-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-04.3" ;
+    rdfs:label "Regulatory Notification"@en ;
+    aegis:partOf rca:D-04 .
+
+rca:D-04-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-04.4" ;
+    rdfs:label "Data Restoration and Recovery"@en ;
+    aegis:partOf rca:D-04 .
+
+# D-05
+
+rca:D-05-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-05.1" ;
+    rdfs:label "Data Minimization"@en ;
+    aegis:partOf rca:D-05 .
+
+rca:D-05-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-05.2" ;
+    rdfs:label "Retention and Archiving"@en ;
+    aegis:partOf rca:D-05 .
+
+rca:D-05-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-05.3" ;
+    rdfs:label "Right to Erasure"@en ;
+    aegis:partOf rca:D-05 .
+
+rca:D-05-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-05.4" ;
+    rdfs:label "Data Portability"@en ;
+    aegis:partOf rca:D-05 .
+
+# D-06
+
+rca:D-06-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-06.1" ;
+    rdfs:label "Vendor Risk Assessment"@en ;
+    aegis:partOf rca:D-06 .
+
+rca:D-06-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-06.2" ;
+    rdfs:label "Software Bill of Materials"@en ;
+    aegis:partOf rca:D-06 .
+
+rca:D-06-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-06.3" ;
+    rdfs:label "Contractual Security Obligations"@en ;
+    aegis:partOf rca:D-06 .
+
+rca:D-06-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-06.4" ;
+    rdfs:label "Third-Party Boundary Management"@en ;
+    aegis:partOf rca:D-06 .
+
+# D-07
+
+rca:D-07-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-07.1" ;
+    rdfs:label "Secure-by-Design Principles"@en ;
+    aegis:partOf rca:D-07 .
+
+rca:D-07-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-07.2" ;
+    rdfs:label "Secure Coding Practices"@en ;
+    aegis:partOf rca:D-07 .
+
+rca:D-07-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-07.3" ;
+    rdfs:label "CI/CD Pipeline Security"@en ;
+    aegis:partOf rca:D-07 .
+
+rca:D-07-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-07.4" ;
+    rdfs:label "Change Management"@en ;
+    aegis:partOf rca:D-07 .
+
+# D-08
+
+rca:D-08-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-08.1" ;
+    rdfs:label "General Security Awareness"@en ;
+    aegis:partOf rca:D-08 .
+
+rca:D-08-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-08.2" ;
+    rdfs:label "Role-Specific Competence"@en ;
+    aegis:partOf rca:D-08 .
+
+rca:D-08-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-08.3" ;
+    rdfs:label "Management Board Training"@en ;
+    aegis:partOf rca:D-08 .
+
+# D-09
+
+rca:D-09-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-09.1" ;
+    rdfs:label "Information Security Policies"@en ;
+    aegis:partOf rca:D-09 .
+
+rca:D-09-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-09.2" ;
+    rdfs:label "Impact and Risk Assessments"@en ;
+    aegis:partOf rca:D-09 .
+
+rca:D-09-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-09.3" ;
+    rdfs:label "Asset Inventories"@en ;
+    aegis:partOf rca:D-09 .
+
+rca:D-09-4 a aegis:SubDomain ;
+    aegis:subDomainId "D-09.4" ;
+    rdfs:label "Records of Processing"@en ;
+    aegis:partOf rca:D-09 .
+
+# D-10
+
+rca:D-10-1 a aegis:SubDomain ;
+    aegis:subDomainId "D-10.1" ;
+    rdfs:label "Continuous Security Monitoring"@en ;
+    aegis:partOf rca:D-10 .
+
+rca:D-10-2 a aegis:SubDomain ;
+    aegis:subDomainId "D-10.2" ;
+    rdfs:label "Audit Logging and Traceability"@en ;
+    aegis:partOf rca:D-10 .
+
+rca:D-10-3 a aegis:SubDomain ;
+    aegis:subDomainId "D-10.3" ;
+    rdfs:label "Compliance Testing"@en ;
+    aegis:partOf rca:D-10 .
+
+
+# ============================================================
+# SECTION 10 — NAMED INDIVIDUALS: Domain hasPart SubDomain
+# (explicit inverse links for reasoners)
+# ============================================================
+
+rca:D-01 aegis:hasPart rca:D-01-1 , rca:D-01-2 , rca:D-01-3 , rca:D-01-4 .
+rca:D-02 aegis:hasPart rca:D-02-1 , rca:D-02-2 , rca:D-02-3 , rca:D-02-4 .
+rca:D-03 aegis:hasPart rca:D-03-1 , rca:D-03-2 , rca:D-03-3 , rca:D-03-4 .
+rca:D-04 aegis:hasPart rca:D-04-1 , rca:D-04-2 , rca:D-04-3 , rca:D-04-4 .
+rca:D-05 aegis:hasPart rca:D-05-1 , rca:D-05-2 , rca:D-05-3 , rca:D-05-4 .
+rca:D-06 aegis:hasPart rca:D-06-1 , rca:D-06-2 , rca:D-06-3 , rca:D-06-4 .
+rca:D-07 aegis:hasPart rca:D-07-1 , rca:D-07-2 , rca:D-07-3 , rca:D-07-4 .
+rca:D-08 aegis:hasPart rca:D-08-1 , rca:D-08-2 , rca:D-08-3 .
+rca:D-09 aegis:hasPart rca:D-09-1 , rca:D-09-2 , rca:D-09-3 , rca:D-09-4 .
+rca:D-10 aegis:hasPart rca:D-10-1 , rca:D-10-2 , rca:D-10-3 .
+
+
+# ============================================================
+# SECTION 11 — NAMED INDIVIDUALS: GDPR Clauses (28)
+# ============================================================
+
+rca:GDPR-C01 a aegis:Clause ;
+    aegis:clauseId "GDPR-C01" ; aegis:articleReference "Art. 5(1)(c)" ;
+    aegis:description "Data minimization principle: only data adequate, relevant and limited to what is necessary."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-05-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Core GDPR principle"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:GDPR-C02 a aegis:Clause ;
+    aegis:clauseId "GDPR-C02" ; aegis:articleReference "Art. 5(1)(b)" ;
+    aegis:description "Purpose limitation and storage limitation: data not kept longer than necessary for purpose."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-05-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Retention policy needed"@en ;
+    aegis:companyContextRef "Q12".
+
+rca:GDPR-C03 a aegis:Clause ;
+    aegis:clauseId "GDPR-C03" ; aegis:articleReference "Art. 5(1)(e)" ;
+    aegis:description "Storage limitation: personal data kept in identifiable form no longer than necessary."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-05-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Retention policy needed"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:GDPR-C04 a aegis:Clause ;
+    aegis:clauseId "GDPR-C04" ; aegis:articleReference "Art. 5(1)(f)" ;
+    aegis:description "Integrity and confidentiality principle: protection against unauthorised access to stored data."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-01-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "User passwords, task content"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:GDPR-C05 a aegis:Clause ;
+    aegis:clauseId "GDPR-C05" ; aegis:articleReference "Art. 5(1)(f)" ;
+    aegis:description "Integrity and confidentiality principle: protection against accidental loss, destruction or damage."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-01-4 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Data integrity checks"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:GDPR-C06 a aegis:Clause ;
+    aegis:clauseId "GDPR-C06" ; aegis:articleReference "Art. 17" ;
+    aegis:description "Right to erasure: controller must erase personal data on request."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-05-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Delete account feature needed"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:GDPR-C07 a aegis:Clause ;
+    aegis:clauseId "GDPR-C07" ; aegis:articleReference "Art. 20" ;
+    aegis:description "Right to data portability: data subject receives data in structured, machine-readable format."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-05-4 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Export feature needed"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:GDPR-C08 a aegis:Clause ;
+    aegis:clauseId "GDPR-C08" ; aegis:articleReference "Art. 24(1)" ;
+    aegis:description "Controller responsibility: implement appropriate technical and organisational measures; document policies."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Security policies required"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:GDPR-C09 a aegis:Clause ;
+    aegis:clauseId "GDPR-C09" ; aegis:articleReference "Art. 25(1)" ;
+    aegis:description "Data protection by design: integrate data protection measures into processing design from the outset."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-07-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Privacy by design required"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:GDPR-C10 a aegis:Clause ;
+    aegis:clauseId "GDPR-C10" ; aegis:articleReference "Art. 25(2)" ;
+    aegis:description "Data protection by default: only process data necessary for each specific purpose; restrict access accordingly."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-03-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Role-based access required"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:GDPR-C11 a aegis:Clause ;
+    aegis:clauseId "GDPR-C11" ; aegis:articleReference "Art. 28(1)" ;
+    aegis:description "Processor obligations: controller uses only processors providing sufficient guarantees."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-06-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "AWS, Firebase, Stripe DPAs"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:GDPR-C12 a aegis:Clause ;
+    aegis:clauseId "GDPR-C12" ; aegis:articleReference "Art. 28(3)" ;
+    aegis:description "Data Processing Agreement: mandatory contractual clauses binding the processor to security obligations."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-06-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "DPA with all processors"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:GDPR-C13 a aegis:Clause ;
+    aegis:clauseId "GDPR-C13" ; aegis:articleReference "Art. 30" ;
+    aegis:description "Records of processing activities: controller and processor maintain written records of all processing."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-4 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "RoPA required"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:GDPR-C14 a aegis:Clause ;
+    aegis:clauseId "GDPR-C14" ; aegis:articleReference "Art. 32(1)(a)" ;
+    aegis:description "Encryption of personal data at rest as an appropriate technical security measure."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-01-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Database encryption required"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:GDPR-C15 a aegis:Clause ;
+    aegis:clauseId "GDPR-C15" ; aegis:articleReference "Art. 32(1)(a)" ;
+    aegis:description "Pseudonymisation and encryption of personal data in transit as appropriate measure."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-01-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "HTTPS/TLS required"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:GDPR-C16 a aegis:Clause ;
+    aegis:clauseId "GDPR-C16" ; aegis:articleReference "Art. 32(1)(b)" ;
+    aegis:description "Ability to ensure ongoing availability and resilience; restore data after incident."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-04-4 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Backup/recovery needed"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:GDPR-C17 a aegis:Clause ;
+    aegis:clauseId "GDPR-C17" ; aegis:articleReference "Art. 32(1)(b)" ;
+    aegis:description "Ongoing confidentiality and integrity of processing systems: restrict access to authorised personnel only."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-03-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Access control enforcement"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:GDPR-C18 a aegis:Clause ;
+    aegis:clauseId "GDPR-C18" ; aegis:articleReference "Art. 32(1)(c)" ;
+    aegis:description "Ability to restore availability and access to personal data in a timely manner after incident."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-04-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Incident response plan"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:GDPR-C19 a aegis:Clause ;
+    aegis:clauseId "GDPR-C19" ; aegis:articleReference "Art. 32(1)(d)" ;
+    aegis:description "Regular testing, assessing and evaluating effectiveness of technical and organisational measures."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Security testing required"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:GDPR-C20 a aegis:Clause ;
+    aegis:clauseId "GDPR-C20" ; aegis:articleReference "Art. 32(2)" ;
+    aegis:description "Risk assessment prior to implementing security measures: consider risks of accidental/unlawful destruction."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Security risk assessment"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:GDPR-C21 a aegis:Clause ;
+    aegis:clauseId "GDPR-C21" ; aegis:articleReference "Art. 33(1)" ;
+    aegis:description "Breach notification to supervisory authority within 72 hours of becoming aware."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "CNPD notification required"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:GDPR-C22 a aegis:Clause ;
+    aegis:clauseId "GDPR-C22" ; aegis:articleReference "Art. 33(3)" ;
+    aegis:description "Documentation of all personal data breaches, including facts, effects and remedial action taken."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-4 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Breach log required"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:GDPR-C23 a aegis:Clause ;
+    aegis:clauseId "GDPR-C23" ; aegis:articleReference "Art. 34(1)" ;
+    aegis:description "Breach notification to data subject when breach likely to result in high risk to rights and freedoms."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "User notification required"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:GDPR-C24 a aegis:Clause ;
+    aegis:clauseId "GDPR-C24" ; aegis:articleReference "Art. 35(1)" ;
+    aegis:description "Data Protection Impact Assessment mandatory prior to high-risk processing operations."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "DPIA if high-risk processing"@en ;
+    aegis:companyContextRef "Q21".
+
+rca:GDPR-C25 a aegis:Clause ;
+    aegis:clauseId "GDPR-C25" ; aegis:articleReference "Art. 35(7)" ;
+    aegis:description "DPIA must include systematic description of processing and purposes, necessity assessment, risk assessment."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "DPIA documentation"@en ;
+    aegis:companyContextRef "Q21".
+
+rca:GDPR-C26 a aegis:Clause ;
+    aegis:clauseId "GDPR-C26" ; aegis:articleReference "Art. 37" ;
+    aegis:description "Designation of Data Protection Officer where required by scale/nature of processing."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "DPO required for special category data"@en ;
+    aegis:companyContextRef "Q23".
+
+rca:GDPR-C27 a aegis:Clause ;
+    aegis:clauseId "GDPR-C27" ; aegis:articleReference "Art. 39(1)(b)" ;
+    aegis:description "DPO task: monitoring compliance; training of staff involved in processing operations."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-08-1 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Security awareness training"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:GDPR-C28 a aegis:Clause ;
+    aegis:clauseId "GDPR-C28" ; aegis:articleReference "Art. 39(1)(b)" ;
+    aegis:description "DPO task: raising awareness and training staff who carry out processing (role-specific obligations)."@en ;
+    aegis:clauseOf rca:GDPR ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:CONTROLLER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Developer security training"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:GDPR aegis:hasClauses
+    rca:GDPR-C01 , rca:GDPR-C02 , rca:GDPR-C03 , rca:GDPR-C04 ,
+    rca:GDPR-C05 , rca:GDPR-C06 , rca:GDPR-C07 , rca:GDPR-C08 ,
+    rca:GDPR-C09 , rca:GDPR-C10 , rca:GDPR-C11 , rca:GDPR-C12 ,
+    rca:GDPR-C13 , rca:GDPR-C14 , rca:GDPR-C15 , rca:GDPR-C16 ,
+    rca:GDPR-C17 , rca:GDPR-C18 , rca:GDPR-C19 , rca:GDPR-C20 ,
+    rca:GDPR-C21 , rca:GDPR-C22 , rca:GDPR-C23 , rca:GDPR-C24 ,
+    rca:GDPR-C25 , rca:GDPR-C26 , rca:GDPR-C27 , rca:GDPR-C28 .
+
+
+# ============================================================
+# SECTION 12 — NAMED INDIVIDUALS: CRA Clauses (26)
+# ============================================================
+
+rca:CRA-C01 a aegis:Clause ;
+    aegis:clauseId "CRA-C01" ; aegis:articleReference "Annex I, Part I, §2(a)" ;
+    aegis:description "No known exploitable vulnerabilities at delivery; products designed with no known exploitable vulnerabilities."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Pre-release scanning"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C02 a aegis:Clause ;
+    aegis:clauseId "CRA-C02" ; aegis:articleReference "Annex I, Part I, §2(b)" ;
+    aegis:description "Secure by default configuration; product delivered in most secure default state."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-07-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Secure defaults required"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C03 a aegis:Clause ;
+    aegis:clauseId "CRA-C03" ; aegis:articleReference "Annex I, Part I, §2(b)" ;
+    aegis:description "Secure default configuration: disable unused ports, services, interfaces; no default passwords."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-03-4 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Secure defaults required"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C04 a aegis:Clause ;
+    aegis:clauseId "CRA-C04" ; aegis:articleReference "Annex I, Part I, §2(c)" ;
+    aegis:description "Security updates: product can receive security updates, including automatic update mechanisms."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Update mechanism required"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:CRA-C05 a aegis:Clause ;
+    aegis:clauseId "CRA-C05" ; aegis:articleReference "Annex I, Part I, §2(d)" ;
+    aegis:description "Protection from unauthorised access: authentication, identity management and access control measures."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-03-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Authentication system"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:CRA-C06 a aegis:Clause ;
+    aegis:clauseId "CRA-C06" ; aegis:articleReference "Annex I, Part I, §2(d)" ;
+    aegis:description "Authentication controls including where appropriate multi-factor or continuous authentication."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-03-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "MFA recommended"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:CRA-C07 a aegis:Clause ;
+    aegis:clauseId "CRA-C07" ; aegis:articleReference "Annex I, Part I, §2(e)" ;
+    aegis:description "Protection of confidentiality of stored data: encryption of personal and other sensitive data at rest."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-01-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Database encryption"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:CRA-C08 a aegis:Clause ;
+    aegis:clauseId "CRA-C08" ; aegis:articleReference "Annex I, Part I, §2(e)" ;
+    aegis:description "Protection of confidentiality of transmitted data: encryption of data in transit."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-01-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "TLS required"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:CRA-C09 a aegis:Clause ;
+    aegis:clauseId "CRA-C09" ; aegis:articleReference "Annex I, Part I, §2(f)" ;
+    aegis:description "Protection of integrity: no unauthorised manipulation of data, commands or configuration."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-01-4 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Data integrity checks"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:CRA-C10 a aegis:Clause ;
+    aegis:clauseId "CRA-C10" ; aegis:articleReference "Annex I, Part I, §2(g)" ;
+    aegis:description "Data minimization in product design: process only data necessary for intended function."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-05-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Privacy by design"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:CRA-C11 a aegis:Clause ;
+    aegis:clauseId "CRA-C11" ; aegis:articleReference "Annex I, Part I, §2(h)" ;
+    aegis:description "Availability protection: resilience against denial-of-service attacks; limit impact of DoS."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-04-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "DoS protection"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:CRA-C12 a aegis:Clause ;
+    aegis:clauseId "CRA-C12" ; aegis:articleReference "Annex I, Part I, §2(i)" ;
+    aegis:description "Limit attack surface: product minimises attack surface including interfaces, unnecessary functions."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-10-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "API minimization"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C13 a aegis:Clause ;
+    aegis:clauseId "CRA-C13" ; aegis:articleReference "Annex I, Part I, §2(j)" ;
+    aegis:description "Reduce impact of incidents: design to limit severity of exploits; fail-safe mechanisms."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-04-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Fail-safe mechanisms"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:CRA-C14 a aegis:Clause ;
+    aegis:clauseId "CRA-C14" ; aegis:articleReference "Annex I, Part I, §2(k)" ;
+    aegis:description "Record and monitor internal activity: logging of security-relevant events; audit trail of access."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Audit logging"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:CRA-C15 a aegis:Clause ;
+    aegis:clauseId "CRA-C15" ; aegis:articleReference "Annex I, Part I, §2(l)" ;
+    aegis:description "Secure and verifiable updates: authentication of updates; cryptographic integrity verification."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-01-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Update signing"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:CRA-C16 a aegis:Clause ;
+    aegis:clauseId "CRA-C16" ; aegis:articleReference "Annex I, Part I, §2(m)" ;
+    aegis:description "Secure permanent data removal by users: product allows complete and secure data deletion."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-05-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Delete account feature"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:CRA-C17 a aegis:Clause ;
+    aegis:clauseId "CRA-C17" ; aegis:articleReference "Annex I, Part II, §1" ;
+    aegis:description "Vulnerability identification and documentation: identify and document components; produce SBOM."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Ongoing vulnerability tracking"@en ;
+    aegis:companyContextRef "Q16".
+
+rca:CRA-C18 a aegis:Clause ;
+    aegis:clauseId "CRA-C18" ; aegis:articleReference "Annex I, Part II, §1" ;
+    aegis:description "Software Bill of Materials: document all third-party components and dependencies in machine-readable format."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-06-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "SBOM required"@en ;
+    aegis:companyContextRef "Q16".
+
+rca:CRA-C19 a aegis:Clause ;
+    aegis:clauseId "CRA-C19" ; aegis:articleReference "Annex I, Part II, §2" ;
+    aegis:description "Address vulnerabilities without delay: remediate vulnerabilities promptly; share information on fixes."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Patch deployment process"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:CRA-C20 a aegis:Clause ;
+    aegis:clauseId "CRA-C20" ; aegis:articleReference "Annex I, Part II, §3" ;
+    aegis:description "Regular testing of security: effective and regular testing and reviews of security of the product."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Security testing"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:CRA-C21 a aegis:Clause ;
+    aegis:clauseId "CRA-C21" ; aegis:articleReference "Annex I, Part II, §4" ;
+    aegis:description "Coordinated vulnerability disclosure policy: publish policy; responsible disclosure process."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "security.txt required"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:CRA-C22 a aegis:Clause ;
+    aegis:clauseId "CRA-C22" ; aegis:articleReference "Art. 13(1)" ;
+    aegis:description "Manufacturer obligation: design, develop and produce products in accordance with Annex I requirements."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-07-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Annex I compliance"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C23 a aegis:Clause ;
+    aegis:clauseId "CRA-C23" ; aegis:articleReference "Art. 13(2)" ;
+    aegis:description "Cybersecurity risk assessment: undertake and document assessment before placing product on market."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Pre-market risk assessment"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C24 a aegis:Clause ;
+    aegis:clauseId "CRA-C24" ; aegis:articleReference "Art. 13(5)" ;
+    aegis:description "Technical documentation: maintain documentation demonstrating conformity for 10 years after placing on market."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Compliance documentation"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:CRA-C25 a aegis:Clause ;
+    aegis:clauseId "CRA-C25" ; aegis:articleReference "Art. 14(1)" ;
+    aegis:description "Notify actively exploited vulnerability to CSIRT/ENISA: early warning within 24h; notification within 72h."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ENISA notification"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:CRA-C26 a aegis:Clause ;
+    aegis:clauseId "CRA-C26" ; aegis:articleReference "Art. 14(2)" ;
+    aegis:description "Notify severe incidents impacting security of product: report to ENISA and relevant CSIRTs."@en ;
+    aegis:clauseOf rca:CRA ; aegis:mappedTo rca:D-02-3 ;
+    aegis:hasObligatedParty rca:MANUFACTURER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Incident reporting"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:CRA aegis:hasClauses
+    rca:CRA-C01 , rca:CRA-C02 , rca:CRA-C03 , rca:CRA-C04 ,
+    rca:CRA-C05 , rca:CRA-C06 , rca:CRA-C07 , rca:CRA-C08 ,
+    rca:CRA-C09 , rca:CRA-C10 , rca:CRA-C11 , rca:CRA-C12 ,
+    rca:CRA-C13 , rca:CRA-C14 , rca:CRA-C15 , rca:CRA-C16 ,
+    rca:CRA-C17 , rca:CRA-C18 , rca:CRA-C19 , rca:CRA-C20 ,
+    rca:CRA-C21 , rca:CRA-C22 , rca:CRA-C23 , rca:CRA-C24 ,
+    rca:CRA-C25 , rca:CRA-C26 .
+
+
+# ============================================================
+# SECTION 13 — NAMED INDIVIDUALS: NIS 2 Clauses (29)
+# ============================================================
+
+rca:NIS2-C01 a aegis:Clause ;
+    aegis:clauseId "NIS2-C01" ; aegis:articleReference "Art. 20(1)" ;
+    aegis:description "Management body approval and oversight of risk management measures; accountability at board level."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Security policies required"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:NIS2-C02 a aegis:Clause ;
+    aegis:clauseId "NIS2-C02" ; aegis:articleReference "Art. 20(2)" ;
+    aegis:description "Management body members must undergo cybersecurity training; ensure sufficient knowledge to govern risks."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-08-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Board training required"@en ;
+    aegis:companyContextRef "Q34".
+
+rca:NIS2-C03 a aegis:Clause ;
+    aegis:clauseId "NIS2-C03" ; aegis:articleReference "Art. 21(2)(a)" ;
+    aegis:description "Risk analysis and information system security policies: documented, board-approved security policies."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Risk analysis required"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:NIS2-C04 a aegis:Clause ;
+    aegis:clauseId "NIS2-C04" ; aegis:articleReference "Art. 21(2)(a)" ;
+    aegis:description "Risk analysis: systematic identification and assessment of risks to network and information systems."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Incident procedures"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:NIS2-C05 a aegis:Clause ;
+    aegis:clauseId "NIS2-C05" ; aegis:articleReference "Art. 21(2)(b)" ;
+    aegis:description "Incident handling: procedures for containment, mitigation and recovery from incidents."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "BCP required"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:NIS2-C06 a aegis:Clause ;
+    aegis:clauseId "NIS2-C06" ; aegis:articleReference "Art. 21(2)(b)" ;
+    aegis:description "Business continuity: backup management, disaster recovery and crisis management procedures."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-4 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "DRP required"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:NIS2-C07 a aegis:Clause ;
+    aegis:clauseId "NIS2-C07" ; aegis:articleReference "Art. 21(2)(c)" ;
+    aegis:description "Business continuity and crisis management: continuity of essential services after major incidents."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-4 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Asset inventory"@en ;
+    aegis:companyContextRef "Q27".
+
+rca:NIS2-C08 a aegis:Clause ;
+    aegis:clauseId "NIS2-C08" ; aegis:articleReference "Art. 21(2)(d)" ;
+    aegis:description "Supply chain security: assess and manage security risks from direct suppliers and service providers."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-06-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Supplier assessment"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:NIS2-C09 a aegis:Clause ;
+    aegis:clauseId "NIS2-C09" ; aegis:articleReference "Art. 21(2)(d)" ;
+    aegis:description "Supply chain: security-related aspects in relationships between entities and their direct suppliers."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-06-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Contractual clauses"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:NIS2-C10 a aegis:Clause ;
+    aegis:clauseId "NIS2-C10" ; aegis:articleReference "Art. 21(2)(e)" ;
+    aegis:description "Security in network/IS acquisition, development and maintenance: integrate security into development lifecycle."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-07-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Change control"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:NIS2-C11 a aegis:Clause ;
+    aegis:clauseId "NIS2-C11" ; aegis:articleReference "Art. 21(2)(e)" ;
+    aegis:description "Security in acquisition, development and maintenance of network and information systems; secure pipelines."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-07-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Pipeline security"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:NIS2-C12 a aegis:Clause ;
+    aegis:clauseId "NIS2-C12" ; aegis:articleReference "Art. 21(2)(e)" ;
+    aegis:description "Vulnerability handling and disclosure: identify and manage vulnerabilities in systems and components."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Vuln management"@en ;
+    aegis:companyContextRef "Q16".
+
+rca:NIS2-C13 a aegis:Clause ;
+    aegis:clauseId "NIS2-C13" ; aegis:articleReference "Art. 21(2)(f)" ;
+    aegis:description "Policies and procedures to assess effectiveness of cybersecurity risk-management measures."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Security testing"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:NIS2-C14 a aegis:Clause ;
+    aegis:clauseId "NIS2-C14" ; aegis:articleReference "Art. 21(2)(g)" ;
+    aegis:description "Basic cyber hygiene practices and cybersecurity training for all staff."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-08-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Awareness training"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:NIS2-C15 a aegis:Clause ;
+    aegis:clauseId "NIS2-C15" ; aegis:articleReference "Art. 21(2)(g)" ;
+    aegis:description "Cybersecurity training: role-specific training for staff with security responsibilities."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Role training"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:NIS2-C16 a aegis:Clause ;
+    aegis:clauseId "NIS2-C16" ; aegis:articleReference "Art. 21(2)(h)" ;
+    aegis:description "Cryptography policies: use of cryptography for protection of data at rest."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-01-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Access policies"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:NIS2-C17 a aegis:Clause ;
+    aegis:clauseId "NIS2-C17" ; aegis:articleReference "Art. 21(2)(h)" ;
+    aegis:description "Cryptography policies: use of encryption for protection of data in transit."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-01-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "MFA required"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:NIS2-C18 a aegis:Clause ;
+    aegis:clauseId "NIS2-C18" ; aegis:articleReference "Art. 21(2)(h)" ;
+    aegis:description "Cryptography policies: encryption key management as part of cryptographic controls."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-01-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Encryption required"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:NIS2-C19 a aegis:Clause ;
+    aegis:clauseId "NIS2-C19" ; aegis:articleReference "Art. 21(2)(i)" ;
+    aegis:description "Human resources security: staff vetting, onboarding and offboarding security procedures; access lifecycle."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-03-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "IdM required"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:NIS2-C20 a aegis:Clause ;
+    aegis:clauseId "NIS2-C20" ; aegis:articleReference "Art. 21(2)(i)" ;
+    aegis:description "Access control policies: role-based access, need-to-know principle, least privilege enforcement."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-03-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Least privilege"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:NIS2-C21 a aegis:Clause ;
+    aegis:clauseId "NIS2-C21" ; aegis:articleReference "Art. 21(2)(j)" ;
+    aegis:description "Multi-factor authentication or continuous authentication solutions as mandatory baseline."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-03-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Monitoring required"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:NIS2-C22 a aegis:Clause ;
+    aegis:clauseId "NIS2-C22" ; aegis:articleReference "Art. 21(2)(j)" ;
+    aegis:description "Secured communications; secured emergency communication systems; logging."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Audit logging"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:NIS2-C23 a aegis:Clause ;
+    aegis:clauseId "NIS2-C23" ; aegis:articleReference "Art. 21(3)" ;
+    aegis:description "Consider sector-specific supply chain risks when assessing supplier security posture."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-06-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Vendor risk"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:NIS2-C24 a aegis:Clause ;
+    aegis:clauseId "NIS2-C24" ; aegis:articleReference "Art. 21(3)" ;
+    aegis:description "Supply chain boundary management: assess exposure from third-party connections to own systems."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-06-4 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight1  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Boundary management"@en ;
+    aegis:companyContextRef "Q32".
+
+rca:NIS2-C25 a aegis:Clause ;
+    aegis:clauseId "NIS2-C25" ; aegis:articleReference "Art. 23(1)" ;
+    aegis:description "Early warning to CSIRT or competent authority without undue delay and within 24 hours of awareness."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "24h notification"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:NIS2-C26 a aegis:Clause ;
+    aegis:clauseId "NIS2-C26" ; aegis:articleReference "Art. 23(2)" ;
+    aegis:description "Incident notification within 72 hours including initial assessment of severity and impact."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "72h notification"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:NIS2-C27 a aegis:Clause ;
+    aegis:clauseId "NIS2-C27" ; aegis:articleReference "Art. 23(3)" ;
+    aegis:description "Final incident report within one month: detailed description, type of threat, root cause, cross-border impact."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Final report"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:NIS2-C28 a aegis:Clause ;
+    aegis:clauseId "NIS2-C28" ; aegis:articleReference "Art. 23(6)" ;
+    aegis:description "Significant incident determination: entities must classify incidents by impact on service continuity."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-04-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Detection systems"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:NIS2-C29 a aegis:Clause ;
+    aegis:clauseId "NIS2-C29" ; aegis:articleReference "Art. 21(2)(b)" ;
+    aegis:description "Incident detection mechanisms: ability to detect security events and classify as incidents in real time."@en ;
+    aegis:clauseOf rca:NIS2 ; aegis:mappedTo rca:D-10-1 ;
+    aegis:hasObligatedParty rca:ESSENTIAL_OR_IMPORTANT_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Continuous monitoring"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:NIS2 aegis:hasClauses
+    rca:NIS2-C01 , rca:NIS2-C02 , rca:NIS2-C03 , rca:NIS2-C04 ,
+    rca:NIS2-C05 , rca:NIS2-C06 , rca:NIS2-C07 , rca:NIS2-C08 ,
+    rca:NIS2-C09 , rca:NIS2-C10 , rca:NIS2-C11 , rca:NIS2-C12 ,
+    rca:NIS2-C13 , rca:NIS2-C14 , rca:NIS2-C15 , rca:NIS2-C16 ,
+    rca:NIS2-C17 , rca:NIS2-C18 , rca:NIS2-C19 , rca:NIS2-C20 ,
+    rca:NIS2-C21 , rca:NIS2-C22 , rca:NIS2-C23 , rca:NIS2-C24 ,
+    rca:NIS2-C25 , rca:NIS2-C26 , rca:NIS2-C27 , rca:NIS2-C28 ,
+    rca:NIS2-C29 .
+
+
+# ============================================================
+# SECTION 14 — NAMED INDIVIDUALS: DORA Clauses (38)
+# ============================================================
+
+rca:DORA-C01 a aegis:Clause ;
+    aegis:clauseId "DORA-C01" ; aegis:articleReference "Art. 5(1)" ;
+    aegis:description "Management body responsible for ICT risk management framework; board accountability for ICT risk."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT framework required"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:DORA-C02 a aegis:Clause ;
+    aegis:clauseId "DORA-C02" ; aegis:articleReference "Art. 5(2)" ;
+    aegis:description "Management body members keep up-to-date knowledge of ICT risk; regular training on digital resilience."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-08-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Board oversight"@en ;
+    aegis:companyContextRef "Q34".
+
+rca:DORA-C03 a aegis:Clause ;
+    aegis:clauseId "DORA-C03" ; aegis:articleReference "Art. 6(1)" ;
+    aegis:description "Sound, comprehensive and well-documented ICT risk management framework approved by management body."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT policies"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:DORA-C04 a aegis:Clause ;
+    aegis:clauseId "DORA-C04" ; aegis:articleReference "Art. 6(4)" ;
+    aegis:description "ICT risk management framework: document all ICT risks; assess likelihood and impact of risk scenarios."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT risk assessment"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:DORA-C05 a aegis:Clause ;
+    aegis:clauseId "DORA-C05" ; aegis:articleReference "Art. 7(1)" ;
+    aegis:description "Identify and classify all ICT assets: hardware, software, data assets and ICT-related processes."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-09-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT inventory"@en ;
+    aegis:companyContextRef "Q27".
+
+rca:DORA-C06 a aegis:Clause ;
+    aegis:clauseId "DORA-C06" ; aegis:articleReference "Art. 7(2)" ;
+    aegis:description "ICT asset management: changes to ICT assets documented; configuration management for all assets."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-07-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Change control"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:DORA-C07 a aegis:Clause ;
+    aegis:clauseId "DORA-C07" ; aegis:articleReference "Art. 8(1)" ;
+    aegis:description "Continuously identify all sources of ICT risk including third-party exposure; implement detection tools."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-10-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT monitoring"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:DORA-C08 a aegis:Clause ;
+    aegis:clauseId "DORA-C08" ; aegis:articleReference "Art. 8(2)" ;
+    aegis:description "Identify and assess vulnerabilities in ICT systems; document and track all identified vulnerabilities."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Vuln management"@en ;
+    aegis:companyContextRef "Q16".
+
+rca:DORA-C09 a aegis:Clause ;
+    aegis:clauseId "DORA-C09" ; aegis:articleReference "Art. 9(2)" ;
+    aegis:description "Protection of confidentiality and integrity: encryption of sensitive data at rest."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-01-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Encryption"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:DORA-C10 a aegis:Clause ;
+    aegis:clauseId "DORA-C10" ; aegis:articleReference "Art. 9(2)" ;
+    aegis:description "Protection of data in transit: encryption of data during transmission across networks."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-01-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "TLS required"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:DORA-C11 a aegis:Clause ;
+    aegis:clauseId "DORA-C11" ; aegis:articleReference "Art. 9(2)" ;
+    aegis:description "Protection of integrity and availability of data: prevent unauthorised modification of data and systems."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-01-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Access control"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:DORA-C12 a aegis:Clause ;
+    aegis:clauseId "DORA-C12" ; aegis:articleReference "Art. 9(4)(a)" ;
+    aegis:description "Logging mechanisms: log all ICT-related activities; ensure traceability of operations and access."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Audit trails"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:DORA-C13 a aegis:Clause ;
+    aegis:clauseId "DORA-C13" ; aegis:articleReference "Art. 9(4)(b)" ;
+    aegis:description "ICT systems updates: policies and procedures for timely patching of vulnerabilities; update management."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-02-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Patch management"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:DORA-C14 a aegis:Clause ;
+    aegis:clauseId "DORA-C14" ; aegis:articleReference "Art. 9(4)(c)" ;
+    aegis:description "Access control: limit logical and physical access to ICT assets; need-to-know and least privilege."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-03-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Least privilege"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:DORA-C15 a aegis:Clause ;
+    aegis:clauseId "DORA-C15" ; aegis:articleReference "Art. 9(4)(d)" ;
+    aegis:description "Access management: dedicated management of access rights including provisioning and deprovisioning."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-03-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "IdM required"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:DORA-C16 a aegis:Clause ;
+    aegis:clauseId "DORA-C16" ; aegis:articleReference "Art. 9(4)(d)" ;
+    aegis:description "Strong authentication mechanisms including multi-factor authentication for all critical systems."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-03-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "MFA required"@en ;
+    aegis:companyContextRef "Q31".
+
+rca:DORA-C17 a aegis:Clause ;
+    aegis:clauseId "DORA-C17" ; aegis:articleReference "Art. 9(4)(d)" ;
+    aegis:description "Cryptographic key protection: secure management of keys used for authentication and data protection."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-01-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Key mgmt"@en ;
+    aegis:companyContextRef "Q28".
+
+rca:DORA-C18 a aegis:Clause ;
+    aegis:clauseId "DORA-C18" ; aegis:articleReference "Art. 9(4)(e)" ;
+    aegis:description "ICT security policies: implement security into ICT systems design and architecture from the outset."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-07-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Incident detection"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:DORA-C19 a aegis:Clause ;
+    aegis:clauseId "DORA-C19" ; aegis:articleReference "Art. 9(4)(f)" ;
+    aegis:description "ICT security policies for software development: secure development practices; code security standards."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-07-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Incident response"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:DORA-C20 a aegis:Clause ;
+    aegis:clauseId "DORA-C20" ; aegis:articleReference "Art. 10(1)" ;
+    aegis:description "Anomaly detection mechanisms: continuously monitor ICT systems for anomalous behaviour and threats."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-10-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Pipeline security"@en ;
+    aegis:companyContextRef "Q29".
+
+rca:DORA-C21 a aegis:Clause ;
+    aegis:clauseId "DORA-C21" ; aegis:articleReference "Art. 10(2)" ;
+    aegis:description "Early warning indicators: mechanisms to identify and detect ICT-related incidents in real time."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Incident triage"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:DORA-C22 a aegis:Clause ;
+    aegis:clauseId "DORA-C22" ; aegis:articleReference "Art. 11(1)" ;
+    aegis:description "Response and recovery: ICT business continuity policy; procedures to respond and recover from incidents."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Containment"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:DORA-C23 a aegis:Clause ;
+    aegis:clauseId "DORA-C23" ; aegis:articleReference "Art. 11(2)" ;
+    aegis:description "Backup policies: tested backup procedures; recovery time and recovery point objectives defined."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Recovery procedures"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:DORA-C24 a aegis:Clause ;
+    aegis:clauseId "DORA-C24" ; aegis:articleReference "Art. 11(3)" ;
+    aegis:description "Incident response plans with defined roles, communication protocols and escalation procedures."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT BCP"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:DORA-C25 a aegis:Clause ;
+    aegis:clauseId "DORA-C25" ; aegis:articleReference "Art. 12(1)" ;
+    aegis:description "Data and system restoration methods: documented and regularly tested procedures to restore operations."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Backup systems"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:DORA-C26 a aegis:Clause ;
+    aegis:clauseId "DORA-C26" ; aegis:articleReference "Art. 13(6)" ;
+    aegis:description "Learning and evolving: post-incident reviews; incorporate findings into patching and update processes."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-02-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Resilience testing"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:DORA-C27 a aegis:Clause ;
+    aegis:clauseId "DORA-C27" ; aegis:articleReference "Art. 13(6)" ;
+    aegis:description "ICT security awareness programmes for all staff; regular cyber hygiene and resilience training."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-08-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Vuln scanning"@en ;
+    aegis:companyContextRef "Q16".
+
+rca:DORA-C28 a aegis:Clause ;
+    aegis:clauseId "DORA-C28" ; aegis:articleReference "Art. 13(6)" ;
+    aegis:description "ICT resilience training programmes tailored to role; specific training for ICT risk management staff."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Pen testing"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:DORA-C29 a aegis:Clause ;
+    aegis:clauseId "DORA-C29" ; aegis:articleReference "Art. 14(1)" ;
+    aegis:description "Crisis communication plans for responsible disclosure of major ICT incidents and vulnerabilities to clients, counterparts and public."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "TLPT required"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:DORA-C30 a aegis:Clause ;
+    aegis:clauseId "DORA-C30" ; aegis:articleReference "Art. 17(1)" ;
+    aegis:description "Classify ICT-related incidents: classification criteria including client impact, data loss, service disruption."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Third-party risk"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:DORA-C31 a aegis:Clause ;
+    aegis:clauseId "DORA-C31" ; aegis:articleReference "Art. 19(1)" ;
+    aegis:description "Report major ICT-related incidents to competent authority: initial notification, intermediate and final report."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Contract safeguards"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:DORA-C32 a aegis:Clause ;
+    aegis:clauseId "DORA-C32" ; aegis:articleReference "Art. 24(1)" ;
+    aegis:description "Digital operational resilience testing programme: regular testing of all ICT tools and systems."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Vendor DD"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:DORA-C33 a aegis:Clause ;
+    aegis:clauseId "DORA-C33" ; aegis:articleReference "Art. 25(1)" ;
+    aegis:description "Testing of ICT tools, systems and processes using scenario-based tests, vulnerability assessments."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Exit strategies"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:DORA-C34 a aegis:Clause ;
+    aegis:clauseId "DORA-C34" ; aegis:articleReference "Art. 26(1)" ;
+    aegis:description "Advanced testing via threat-led penetration testing for significant financial entities."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-02-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Concentration risk"@en ;
+    aegis:companyContextRef "Q15".
+
+rca:DORA-C35 a aegis:Clause ;
+    aegis:clauseId "DORA-C35" ; aegis:articleReference "Art. 28(1)" ;
+    aegis:description "ICT third-party risk management: general principles; risk-based assessment of all ICT providers."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-06-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "24h reporting"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:DORA-C36 a aegis:Clause ;
+    aegis:clauseId "DORA-C36" ; aegis:articleReference "Art. 28(5)" ;
+    aegis:description "Concentration risk assessment: identify and manage risk from critical ICT third-party provider concentration."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-06-1 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "72h report"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:DORA-C37 a aegis:Clause ;
+    aegis:clauseId "DORA-C37" ; aegis:articleReference "Art. 30(1)" ;
+    aegis:description "Key contractual provisions with ICT providers: mandatory security clauses in all ICT service contracts."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-06-3 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Final report"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:DORA-C38 a aegis:Clause ;
+    aegis:clauseId "DORA-C38" ; aegis:articleReference "Art. 30(2)" ;
+    aegis:description "Contractual rights of access, inspection and audit over ICT third-party service providers."@en ;
+    aegis:clauseOf rca:DORA ; aegis:mappedTo rca:D-06-4 ;
+    aegis:hasObligatedParty rca:FINANCIAL_ENTITY ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "ICT records"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:DORA aegis:hasClauses
+    rca:DORA-C01 , rca:DORA-C02 , rca:DORA-C03 , rca:DORA-C04 ,
+    rca:DORA-C05 , rca:DORA-C06 , rca:DORA-C07 , rca:DORA-C08 ,
+    rca:DORA-C09 , rca:DORA-C10 , rca:DORA-C11 , rca:DORA-C12 ,
+    rca:DORA-C13 , rca:DORA-C14 , rca:DORA-C15 , rca:DORA-C16 ,
+    rca:DORA-C17 , rca:DORA-C18 , rca:DORA-C19 , rca:DORA-C20 ,
+    rca:DORA-C21 , rca:DORA-C22 , rca:DORA-C23 , rca:DORA-C24 ,
+    rca:DORA-C25 , rca:DORA-C26 , rca:DORA-C27 , rca:DORA-C28 ,
+    rca:DORA-C29 , rca:DORA-C30 , rca:DORA-C31 , rca:DORA-C32 ,
+    rca:DORA-C33 , rca:DORA-C34 , rca:DORA-C35 , rca:DORA-C36 ,
+    rca:DORA-C37 , rca:DORA-C38 .
+
+
+# ============================================================
+# SECTION 15 — NAMED INDIVIDUALS: AI Act Clauses (29)
+# ============================================================
+
+rca:AIA-C01 a aegis:Clause ;
+    aegis:clauseId "AIA-C01" ; aegis:articleReference "Art. 9(1)" ;
+    aegis:description "Risk management system for high-risk AI: continuous, iterative process throughout lifecycle."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Risk management required"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C02 a aegis:Clause ;
+    aegis:clauseId "AIA-C02" ; aegis:articleReference "Art. 9(2)" ;
+    aegis:description "Risk management measures: identify, analyse and estimate known and foreseeable risks of high-risk AI."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "AI risk assessment"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C03 a aegis:Clause ;
+    aegis:clauseId "AIA-C03" ; aegis:articleReference "Art. 9(6)" ;
+    aegis:description "Testing of high-risk AI: identify appropriate risk management measures; testing against defined metrics."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Testing against defined metrics"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C04 a aegis:Clause ;
+    aegis:clauseId "AIA-C04" ; aegis:articleReference "Art. 9(7)" ;
+    aegis:description "Testing to identify and address risks of unintended outcomes including adversarial robustness testing."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-02-4 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Adversarial robustness testing"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C05 a aegis:Clause ;
+    aegis:clauseId "AIA-C05" ; aegis:articleReference "Art. 10(1)" ;
+    aegis:description "Data governance: data management practices for training, validation and testing datasets."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-05-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Data governance for training sets"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:AIA-C06 a aegis:Clause ;
+    aegis:clauseId "AIA-C06" ; aegis:articleReference "Art. 10(2)" ;
+    aegis:description "Training data: relevance, representativeness, freedom from errors; only data necessary for intended purpose."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-05-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Training data relevance"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:AIA-C07 a aegis:Clause ;
+    aegis:clauseId "AIA-C07" ; aegis:articleReference "Art. 10(3)" ;
+    aegis:description "Data governance practices: examination of training data for biases; documentation and retention of datasets."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-05-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Dataset retention"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C08 a aegis:Clause ;
+    aegis:clauseId "AIA-C08" ; aegis:articleReference "Art. 10(5)" ;
+    aegis:description "Special category data in training: strict minimization; only where strictly necessary and with safeguards."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-05-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Special category data minimization"@en ;
+    aegis:companyContextRef "Q22".
+
+rca:AIA-C09 a aegis:Clause ;
+    aegis:clauseId "AIA-C09" ; aegis:articleReference "Art. 12(1)" ;
+    aegis:description "Logging capabilities: automatic recording of events throughout the lifetime of the high-risk AI system."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "AI logging"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C10 a aegis:Clause ;
+    aegis:clauseId "AIA-C10" ; aegis:articleReference "Art. 12(2)" ;
+    aegis:description "Logs must enable monitoring of AI system operation with respect to occurrence of situations that may present risk."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Log monitoring for risk situations"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C11 a aegis:Clause ;
+    aegis:clauseId "AIA-C11" ; aegis:articleReference "Art. 12(4)" ;
+    aegis:description "Retain logs for period appropriate to intended purpose; at least 6 months where applicable."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-4 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "6-month log retention"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C12 a aegis:Clause ;
+    aegis:clauseId "AIA-C12" ; aegis:articleReference "Art. 13(1)" ;
+    aegis:description "Transparency and provision of information: high-risk AI systems designed to be sufficiently transparent."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "User transparency"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:AIA-C13 a aegis:Clause ;
+    aegis:clauseId "AIA-C13" ; aegis:articleReference "Art. 13(3)" ;
+    aegis:description "Instructions for use: identity of provider, characteristics, capabilities, limitations, performance metrics."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Usage instructions"@en ;
+    aegis:companyContextRef "Q7".
+
+rca:AIA-C14 a aegis:Clause ;
+    aegis:clauseId "AIA-C14" ; aegis:articleReference "Art. 14(1)" ;
+    aegis:description "Human oversight: high-risk AI designed to be effectively overseen by natural persons during period of use."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Oversight by design"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C15 a aegis:Clause ;
+    aegis:clauseId "AIA-C15" ; aegis:articleReference "Art. 14(4)" ;
+    aegis:description "Human oversight measures: persons assigned must have competence, training and authority to intervene."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:DEPLOYER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Competent overseers"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:AIA-C16 a aegis:Clause ;
+    aegis:clauseId "AIA-C16" ; aegis:articleReference "Art. 15(1)" ;
+    aegis:description "Accuracy, robustness and cybersecurity: high-risk AI must achieve appropriate levels throughout lifecycle."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-02-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Accuracy required"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C17 a aegis:Clause ;
+    aegis:clauseId "AIA-C17" ; aegis:articleReference "Art. 15(3)" ;
+    aegis:description "Robustness: resilience against errors, faults and inconsistencies; fail-safe fallback plans."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-01-4 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "AI resilience - fail-safe fallback"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:AIA-C18 a aegis:Clause ;
+    aegis:clauseId "AIA-C18" ; aegis:articleReference "Art. 15(4)" ;
+    aegis:description "Resilience against adversarial manipulation: protection against data poisoning, model poisoning, adversarial inputs."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-01-4 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Resilience against adversarial inputs"@en ;
+    aegis:companyContextRef "Q19".
+
+rca:AIA-C19 a aegis:Clause ;
+    aegis:clauseId "AIA-C19" ; aegis:articleReference "Art. 19(1)" ;
+    aegis:description "Automatically generated logs: provider shall keep AI system logs (Art. 12(1)) for at least 6 months."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Automatically generated logs retention"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C20 a aegis:Clause ;
+    aegis:clauseId "AIA-C20" ; aegis:articleReference "Art. 17(1)" ;
+    aegis:description "Quality management system: written policies, procedures covering all aspects of high-risk AI compliance."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "QMS policies"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:AIA-C21 a aegis:Clause ;
+    aegis:clauseId "AIA-C21" ; aegis:articleReference "Art. 17(1)(c)" ;
+    aegis:description "QMS includes procedures for design control and verification; regular assessment of effectiveness of measures."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "QMS design control verification"@en ;
+    aegis:companyContextRef "Q35".
+
+rca:AIA-C22 a aegis:Clause ;
+    aegis:clauseId "AIA-C22" ; aegis:articleReference "Art. 17(1)(g)" ;
+    aegis:description "QMS includes examination, test and validation procedures; risk management documentation."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "QMS risk management documentation"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C23 a aegis:Clause ;
+    aegis:clauseId "AIA-C23" ; aegis:articleReference "Art. 26(1)" ;
+    aegis:description "Deployer obligations: implement appropriate technical and organisational measures to ensure intended use."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-1 ;
+    aegis:hasObligatedParty rca:DEPLOYER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight2  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Deployer organisational measures"@en ;
+    aegis:companyContextRef "Q33".
+
+rca:AIA-C24 a aegis:Clause ;
+    aegis:clauseId "AIA-C24" ; aegis:articleReference "Art. 26(2)" ;
+    aegis:description "Deployer assigns human oversight to persons with necessary competence, training and authority."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-08-2 ;
+    aegis:hasObligatedParty rca:DEPLOYER ; aegis:hasObligationType rca:ONE_TIME ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Deployer human oversight assignment"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C25 a aegis:Clause ;
+    aegis:clauseId "AIA-C25" ; aegis:articleReference "Art. 72(1)" ;
+    aegis:description "Post-market monitoring system: proactively collect and review data on performance of high-risk AI in real world."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-1 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:CONTINUOUS ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Post-market monitoring"@en ;
+    aegis:companyContextRef "Q26".
+
+rca:AIA-C26 a aegis:Clause ;
+    aegis:clauseId "AIA-C26" ; aegis:articleReference "Art. 73(1)" ;
+    aegis:description "Reporting of serious incidents: providers report to market surveillance authorities within prescribed timelines."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "Serious incident reporting"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:AIA-C27 a aegis:Clause ;
+    aegis:clauseId "AIA-C27" ; aegis:articleReference "Art. 74(1)" ;
+    aegis:description "Market surveillance: authorities verify compliance; test AI systems against regulatory requirements."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-10-3 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "Market surveillance cooperation"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:AIA-C28 a aegis:Clause ;
+    aegis:clauseId "AIA-C28" ; aegis:articleReference "Art. 55(1)" ;
+    aegis:description "GPAI models with systemic risk: adversarial testing; model evaluation against state-of-the-art benchmarks."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-09-2 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:PERIODIC ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:HIGH ;
+    aegis:justification "GPAI adversarial testing"@en ;
+    aegis:companyContextRef "Q8".
+
+rca:AIA-C29 a aegis:Clause ;
+    aegis:clauseId "AIA-C29" ; aegis:articleReference "Art. 55(1)(b)" ;
+    aegis:description "GPAI systemic risk: report serious incidents and possible corrective measures to AI Office without delay."@en ;
+    aegis:clauseOf rca:AIAct ; aegis:mappedTo rca:D-04-3 ;
+    aegis:hasObligatedParty rca:PROVIDER ; aegis:hasObligationType rca:TRIGGERED ; aegis:hasNormativeStrength rca:Weight3  ;
+    aegis:hasRelevance rca:MEDIUM ;
+    aegis:justification "GPAI systemic risk reporting"@en ;
+    aegis:companyContextRef "Q1".
+
+rca:AIAct aegis:hasClauses
+    rca:AIA-C01 , rca:AIA-C02 , rca:AIA-C03 , rca:AIA-C04 ,
+    rca:AIA-C05 , rca:AIA-C06 , rca:AIA-C07 , rca:AIA-C08 ,
+    rca:AIA-C09 , rca:AIA-C10 , rca:AIA-C11 , rca:AIA-C12 ,
+    rca:AIA-C13 , rca:AIA-C14 , rca:AIA-C15 , rca:AIA-C16 ,
+    rca:AIA-C17 , rca:AIA-C18 , rca:AIA-C19 , rca:AIA-C20 ,
+    rca:AIA-C21 , rca:AIA-C22 , rca:AIA-C23 , rca:AIA-C24 ,
+    rca:AIA-C25 , rca:AIA-C26 , rca:AIA-C27 , rca:AIA-C28 ,
+    rca:AIA-C29 .
+
+
+# ============================================================
+# SECTION 16 — KNOWN TENSIONS (rca:hasTensionWith)
+# ============================================================
+
+# D-05.3 Erasure vs D-10.2 Logging
+rca:GDPR-C06 rca:hasTensionWith rca:DORA-C12 .
+rca:GDPR-C06 rca:hasTensionWith rca:AIA-C09 .
+rca:GDPR-C06 rca:hasTensionWith rca:AIA-C19 .
+
+# D-05.2 Retention vs D-10.2 Logging
+rca:GDPR-C02 rca:hasTensionWith rca:DORA-C12 .
+rca:GDPR-C03 rca:hasTensionWith rca:DORA-C12 .
+
+# D-04.3 Notification timing conflicts: GDPR 72h vs NIS2 24h vs CRA 24/72h vs AIAct 15/2 days
+rca:GDPR-C21 rca:hasTensionWith rca:NIS2-C25 .
+rca:GDPR-C21 rca:hasTensionWith rca:CRA-C25 .
+rca:GDPR-C21 rca:hasTensionWith rca:AIA-C26 .
+rca:NIS2-C25 rca:hasTensionWith rca:CRA-C25 .
+rca:NIS2-C25 rca:hasTensionWith rca:DORA-C31 .
+
+# D-06.1 Supply chain: DORA concentration risk vs NIS2 sector-specific assessment
+rca:DORA-C36 rca:hasTensionWith rca:NIS2-C23 .
+
+# D-05.1 Data minimization: AI Act training data vs GDPR personal data
+rca:AIA-C05 rca:hasTensionWith rca:GDPR-C01 .
+rca:AIA-C08 rca:hasTensionWith rca:GDPR-C01 .
+
+# ============================================================
+# END OF ONTOLOGY
+# ============================================================
+
+
+# ============================================================
+# SECTION 17 — APPLICABILITY CONDITIONS (per Regulation)
+# ============================================================
+# Source: 06_Clause_Mapping_Matrix.ods / APPLICABILITY_CONDITIONS sheet
+# These conditions are generic (company-agnostic).
+# A company context instantiates them with observed values.
+
+rca:AC-GDPR-1 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "processes_personal_data" ;
+    aegis:threshold "ANY — at least one personal data attribute processed" ;
+    aegis:description "Applies if the entity processes personal data of EU residents in any capacity."@en .
+
+rca:AC-GDPR-2 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "eu_data_subjects" ;
+    aegis:threshold "ANY — at least one EU resident as data subject" ;
+    aegis:description "Applies if data subjects are located in the EU regardless of where the controller is established."@en .
+
+rca:AC-GDPR-3 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "large_scale_processing" ;
+    aegis:threshold "TRUE — high volume or special category data" ;
+    aegis:description "DPIA mandatory if large-scale processing of special categories or systematic monitoring."@en .
+
+rca:AC-CRA-1 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "places_digital_products_eu" ;
+    aegis:threshold "TRUE — places products with digital elements on EU market" ;
+    aegis:description "Applies to any manufacturer placing a product with digital elements on the EU market."@en .
+
+rca:AC-CRA-2 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "product_class" ;
+    aegis:threshold "Standard | Important | Critical — per CRA Annex III/IV" ;
+    aegis:description "Product classification determines whether self-declaration or third-party audit is required."@en .
+
+rca:AC-NIS2-1 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "nis2_sector" ;
+    aegis:threshold "Annex I (Essential) or Annex II (Important) sector" ;
+    aegis:description "Applies to entities operating in sectors listed in NIS 2 Annexes I or II."@en .
+
+rca:AC-NIS2-2 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "size_employees" ;
+    aegis:threshold "≥50 employees (medium) OR ≥250 employees (large)" ;
+    aegis:description "Size threshold: medium entities (≥50 emp.) are Important; large (≥250 emp.) may be Essential."@en .
+
+rca:AC-NIS2-3 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "size_revenue" ;
+    aegis:threshold "≥€10M annual turnover (medium) OR ≥€50M (large)" ;
+    aegis:description "Revenue threshold used in conjunction with employee count for entity classification."@en .
+
+rca:AC-DORA-1 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "dora_financial_entity" ;
+    aegis:threshold "TRUE — credit institution, investment firm, insurer, etc. per DORA Art. 2" ;
+    aegis:description "Applies exclusively to financial entities regulated under DORA Art. 2 definitions."@en .
+
+rca:AC-DORA-2 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "financial_sector" ;
+    aegis:threshold "Banking | Insurance | Investment | Payment | Crypto per Art. 2" ;
+    aegis:description "Specific financial sector determines applicable DORA obligations and supervisory authority."@en .
+
+rca:AC-AIACT-1 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "aiact_high_risk_system" ;
+    aegis:threshold "TRUE — AI system listed in Annex III high-risk categories" ;
+    aegis:description "Applies to providers and deployers of high-risk AI systems per AI Act Annex III."@en .
+
+rca:AC-AIACT-2 a aegis:ApplicabilityCondition ;
+    aegis:applicabilityField "gpai_systemic_risk" ;
+    aegis:threshold "TRUE — GPAI model with systemic risk per Art. 51" ;
+    aegis:description "Additional obligations (Art. 55) apply to GPAI models designated as systemic risk."@en .
+
+# Link conditions to regulations
+rca:GDPR aegis:hasApplicabilityCondition rca:AC-GDPR-1 , rca:AC-GDPR-2 , rca:AC-GDPR-3 .
+rca:CRA  aegis:hasApplicabilityCondition rca:AC-CRA-1  , rca:AC-CRA-2 .
+rca:NIS2 aegis:hasApplicabilityCondition rca:AC-NIS2-1 , rca:AC-NIS2-2 , rca:AC-NIS2-3 .
+rca:DORA aegis:hasApplicabilityCondition rca:AC-DORA-1 , rca:AC-DORA-2 .
+rca:AIAct aegis:hasApplicabilityCondition rca:AC-AIACT-1 , rca:AC-AIACT-2 .
+
+
+# ============================================================
+# SECTION 18 — COMPLEMENTARITY PAIRS (Jaccard M1, all 10 pairs)
+# ============================================================
+# Source: 06_Clause_Mapping_Matrix.ods / COMPLEMENTARITY_ANALYSIS sheet
+# jaccardIndex = |D(Ra) ∩ D(Rb)| / |D(Ra) ∪ D(Rb)|  (Ferreira 2016, adapted)
+
+rca:CP-GDPR-CRA a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:GDPR ;
+    aegis:comparesRegulationB rca:CRA ;
+    aegis:intersectionCount 11 ;
+    aegis:unionCount 31 ;
+    aegis:jaccardIndex 0.355 ;
+    aegis:complementarityIndex 0.645 ;
+    aegis:pairInterpretation "Moderate overlap — complementary on D-01, D-03, D-04, D-05, D-07, D-09, D-10; CRA sole authority on D-02, D-06"@en .
+
+rca:CP-GDPR-NIS2 a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:GDPR ;
+    aegis:comparesRegulationB rca:NIS2 ;
+    aegis:intersectionCount 12 ;
+    aegis:unionCount 31 ;
+    aegis:jaccardIndex 0.387 ;
+    aegis:complementarityIndex 0.613 ;
+    aegis:pairInterpretation "Moderate overlap — NIS 2 sole authority on D-07.3 (CI/CD); GDPR sole authority on D-05"@en .
+
+rca:CP-GDPR-DORA a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:GDPR ;
+    aegis:comparesRegulationB rca:DORA ;
+    aegis:intersectionCount 12 ;
+    aegis:unionCount 34 ;
+    aegis:jaccardIndex 0.353 ;
+    aegis:complementarityIndex 0.647 ;
+    aegis:pairInterpretation "Moderate overlap — DORA sole authority on D-07.2, D-07.4, D-09.3; GDPR sole authority on D-05"@en .
+
+rca:CP-GDPR-AIACT a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:GDPR ;
+    aegis:comparesRegulationB rca:AIAct ;
+    aegis:intersectionCount 10 ;
+    aegis:unionCount 25 ;
+    aegis:jaccardIndex 0.400 ;
+    aegis:complementarityIndex 0.600 ;
+    aegis:pairInterpretation "Moderate overlap — AI Act focuses on D-09.2, D-10.2, D-08.2; GDPR sole authority on D-05.4"@en .
+
+rca:CP-CRA-NIS2 a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:CRA ;
+    aegis:comparesRegulationB rca:NIS2 ;
+    aegis:intersectionCount 12 ;
+    aegis:unionCount 33 ;
+    aegis:jaccardIndex 0.364 ;
+    aegis:complementarityIndex 0.636 ;
+    aegis:pairInterpretation "Moderate overlap — CRA sole authority on D-02.3, D-03.4, D-06.2; NIS 2 sole authority on D-07.3"@en .
+
+rca:CP-CRA-DORA a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:CRA ;
+    aegis:comparesRegulationB rca:DORA ;
+    aegis:intersectionCount 15 ;
+    aegis:unionCount 33 ;
+    aegis:jaccardIndex 0.455 ;
+    aegis:complementarityIndex 0.545 ;
+    aegis:pairInterpretation "Moderate overlap — strong convergence on D-01, D-02, D-03, D-10; different obligated parties"@en .
+
+rca:CP-CRA-AIACT a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:CRA ;
+    aegis:comparesRegulationB rca:AIAct ;
+    aegis:intersectionCount 11 ;
+    aegis:unionCount 26 ;
+    aegis:jaccardIndex 0.423 ;
+    aegis:complementarityIndex 0.577 ;
+    aegis:pairInterpretation "Moderate overlap — AI Act extends CRA in D-09.2 and D-10.2 for AI-specific risk"@en .
+
+rca:CP-NIS2-DORA a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:NIS2 ;
+    aegis:comparesRegulationB rca:DORA ;
+    aegis:intersectionCount 21 ;
+    aegis:unionCount 28 ;
+    aegis:jaccardIndex 0.750 ;
+    aegis:complementarityIndex 0.250 ;
+    aegis:pairInterpretation "High overlap — near-redundant for financial entities in essential sectors; DORA is the lex specialis"@en .
+
+rca:CP-NIS2-AIACT a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:NIS2 ;
+    aegis:comparesRegulationB rca:AIAct ;
+    aegis:intersectionCount 9 ;
+    aegis:unionCount 29 ;
+    aegis:jaccardIndex 0.310 ;
+    aegis:complementarityIndex 0.690 ;
+    aegis:pairInterpretation "Moderate complementarity — AI Act structurally isolated; covers D-05.1 and D-08.2 not in NIS 2"@en .
+
+rca:CP-DORA-AIACT a aegis:ComplementarityPair ;
+    aegis:comparesRegulationA rca:DORA ;
+    aegis:comparesRegulationB rca:AIAct ;
+    aegis:intersectionCount 11 ;
+    aegis:unionCount 30 ;
+    aegis:jaccardIndex 0.367 ;
+    aegis:complementarityIndex 0.633 ;
+    aegis:pairInterpretation "Moderate overlap — AI Act adds D-05.1 and specific AI risk requirements not covered by DORA"@en .
+
+
+# ============================================================
+# SECTION 19 — STRATEGIC TENSIONS
+# ============================================================
+# Source: 06_Clause_Mapping_Matrix.ods / COMPLEMENTARITY_ANALYSIS (tensions block)
+# tensionScope: STRUCTURAL = permanent design constraint | CONTEXTUAL = compound event dependent
+
+rca:T-001 a aegis:StrategicTension ;
+    aegis:tensionId "T-001" ;
+    aegis:tensionType "TIMING_MISMATCH" ;
+    aegis:tensionScope "CONTEXTUAL" ;
+    aegis:severity "CRITICAL" ;
+    aegis:resolutionPattern "Max-SLA Routing — adopt the strictest deadline (24h) as the unified workflow trigger; satisfies all regulations simultaneously" ;
+    aegis:description "Notification timing conflict on D-04.3: GDPR requires 72h (Art. 33), NIS 2 requires 24h early warning (Art. 23(1)), CRA requires 24h (Art. 14(1)), DORA requires 24h (Art. 17(3)). Tension is CONTEXTUAL: only materialises when a single incident simultaneously triggers personal data breach (GDPR), exploited vulnerability (CRA), significant incident (NIS 2), and major ICT incident (DORA)."@en ;
+    aegis:affectsSubDomain rca:D-04-3 ;
+    aegis:involvesRegulation rca:GDPR , rca:CRA , rca:NIS2 , rca:DORA ;
+    aegis:involvesClauses rca:GDPR-C21 , rca:CRA-C25 , rca:NIS2-C25 , rca:DORA-C35 .
+
+rca:T-002 a aegis:StrategicTension ;
+    aegis:tensionId "T-002" ;
+    aegis:tensionType "RETENTION_CONFLICT" ;
+    aegis:tensionScope "STRUCTURAL" ;
+    aegis:severity "CRITICAL" ;
+    aegis:resolutionPattern "Cryptographic Sharding — retain anonymised/pseudonymised log records; erase the personal data binding key on erasure request; satisfies both obligations structurally" ;
+    aegis:description "Retention conflict between GDPR right to erasure (D-05.3, Art. 17) and AI Act mandatory log retention of ≥6 months (D-10.2, Art. 19). STRUCTURAL because both obligations apply permanently whenever an AI system processes personal data: erasure requests are ongoing, log retention is continuous. Cannot be resolved per-event."@en ;
+    aegis:affectsSubDomain rca:D-05-3 ;
+    aegis:involvesRegulation rca:GDPR , rca:AIAct ;
+    aegis:involvesClauses rca:GDPR-C06 , rca:AIA-C19 .
+
+rca:T-003 a aegis:StrategicTension ;
+    aegis:tensionId "T-003" ;
+    aegis:tensionType "TRIGGER_MISMATCH" ;
+    aegis:tensionScope "CONTEXTUAL" ;
+    aegis:severity "MEDIUM" ;
+    aegis:resolutionPattern "Unified Assessment — produce a single document that meets both DPIA (GDPR Art. 35) and FRIA (AI Act Art. 9/22) requirements with dual signoff; reduces assessment overhead while satisfying both triggers" ;
+    aegis:description "Assessment trigger mismatch on D-09.2: GDPR DPIA is ONE_TIME per processing activity (Art. 35), AI Act risk management is CONTINUOUS throughout lifecycle (Art. 9(1)). Tension is CONTEXTUAL: only materialises for AI systems processing personal data where both triggers activate. Methodologically manageable via unified assessment."@en ;
+    aegis:affectsSubDomain rca:D-09-2 ;
+    aegis:involvesRegulation rca:GDPR , rca:AIAct ;
+    aegis:involvesClauses rca:GDPR-C24 , rca:AIA-C01 , rca:AIA-C02 .
+
+rca:T-004 a aegis:StrategicTension ;
+    aegis:tensionId "T-004" ;
+    aegis:tensionType "ALIGNMENT_OPPORTUNITY" ;
+    aegis:tensionScope "CONTEXTUAL" ;
+    aegis:severity "LOW" ;
+    aegis:resolutionPattern "Unified 24h workflow — NIS 2 and DORA both require 24h notification; a single process satisfies both; the tension is an opportunity for process consolidation rather than conflict" ;
+    aegis:description "NIS 2 (Art. 23(1)) and DORA (Art. 17(3)) both require 24h notification for significant incidents. For entities subject to both (financial entities in essential sectors), this is an alignment opportunity: the identical deadline means a single 24h process satisfies both obligations. Classified as ALIGNMENT_OPPORTUNITY, not a conflict."@en ;
+    aegis:affectsSubDomain rca:D-04-3 ;
+    aegis:involvesRegulation rca:NIS2 , rca:DORA ;
+    aegis:involvesClauses rca:NIS2-C25 , rca:DORA-C35 .
+
+
+# ============================================================
+# SECTION 20 — SUB-DOMAIN METRICS (pre-computed NI aggregates)
+# ============================================================
+# Source: 06_Clause_Mapping_Matrix.ods / NORMATIVE_INTENSITY sheet (top-10 + derived)
+# These are pre-computed for all 5 regulations combined.
+
+rca:SM-D-01-3 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 2 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-01-3 aegis:hasMetrics rca:SM-D-01-3 .
+
+rca:SM-D-02-1 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 5 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-02-1 aegis:hasMetrics rca:SM-D-02-1 .
+
+rca:SM-D-02-2 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 4 ; aegis:dominantObligationType "TRIGGERED" .
+rca:D-02-2 aegis:hasMetrics rca:SM-D-02-2 .
+
+rca:SM-D-02-3 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 2 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-02-3 aegis:hasMetrics rca:SM-D-02-3 .
+
+rca:SM-D-02-4 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 3 ; aegis:dominantObligationType "PERIODIC" .
+rca:D-02-4 aegis:hasMetrics rca:SM-D-02-4 .
+
+rca:SM-D-03-1 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 6 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-03-1 aegis:hasMetrics rca:SM-D-03-1 .
+
+rca:SM-D-03-3 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.75 ;
+    aegis:totalClauseCount 4 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-03-3 aegis:hasMetrics rca:SM-D-03-3 .
+
+rca:SM-D-03-4 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 1 ; aegis:dominantObligationType "ONE_TIME" .
+rca:D-03-4 aegis:hasMetrics rca:SM-D-03-4 .
+
+rca:SM-D-04-1 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 3.0 ; aegis:avgNI 3.0 ;
+    aegis:totalClauseCount 4 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-04-1 aegis:hasMetrics rca:SM-D-04-1 .
+
+rca:SM-D-04-3 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.909 ;
+    aegis:totalClauseCount 11 ; aegis:dominantObligationType "TRIGGERED" .
+rca:D-04-3 aegis:hasMetrics rca:SM-D-04-3 .
+
+rca:SM-D-09-1 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.769 ;
+    aegis:totalClauseCount 13 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-09-1 aegis:hasMetrics rca:SM-D-09-1 .
+
+rca:SM-D-09-2 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.833 ;
+    aegis:totalClauseCount 12 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-09-2 aegis:hasMetrics rca:SM-D-09-2 .
+
+rca:SM-D-10-2 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.750 ;
+    aegis:totalClauseCount 8 ; aegis:dominantObligationType "CONTINUOUS" .
+rca:D-10-2 aegis:hasMetrics rca:SM-D-10-2 .
+
+rca:SM-D-10-3 a aegis:SubDomainMetrics ;
+    aegis:maxNI 3.0 ; aegis:minNI 2.0 ; aegis:avgNI 2.750 ;
+    aegis:totalClauseCount 8 ; aegis:dominantObligationType "PERIODIC" .
+rca:D-10-3 aegis:hasMetrics rca:SM-D-10-3 .
+
+# ============================================================
+# END OF ONTOLOGY v2.0
+# ============================================================

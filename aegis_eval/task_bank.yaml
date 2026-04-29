@@ -1,0 +1,532 @@
+tasks:
+- id: list_all_regulations
+  category: basic_retrieval
+  difficulty: easy
+  question: List all regulations in the knowledge graph
+  expected_cypher: MATCH (r:Regulation) RETURN r.regulationId AS id, r.label AS name
+    ORDER BY r.regulationId
+  expected_result:
+    row_count: 5
+    columns:
+    - id
+    - name
+- id: count_total_clauses
+  category: basic_retrieval
+  difficulty: easy
+  question: How many clauses are there in total?
+  expected_cypher: MATCH (c:Clause) RETURN count(c) AS totalClauses
+  expected_result:
+    row_count: 1
+    columns:
+    - totalClauses
+    row_0:
+      totalClauses: 150
+- id: list_all_domains
+  category: basic_retrieval
+  difficulty: easy
+  question: List all security domains with their IDs and names
+  expected_cypher: MATCH (d:Domain) RETURN d.domainId AS id, d.name AS name ORDER
+    BY d.domainId
+  expected_result:
+    row_count: 10
+    columns:
+    - id
+    - name
+- id: list_all_subdomains
+  category: basic_retrieval
+  difficulty: easy
+  question: List all subdomains with their IDs and names
+  expected_cypher: MATCH (sd:SubDomain) RETURN sd.subDomainId AS id, sd.name AS name
+    ORDER BY sd.subDomainId
+  expected_result:
+    row_count: 38
+    columns:
+    - id
+    - name
+- id: count_articles
+  category: basic_retrieval
+  difficulty: easy
+  question: How many articles are there in total?
+  expected_cypher: MATCH (a:Article) RETURN count(a) AS totalArticles
+  expected_result:
+    row_count: 1
+    columns:
+    - totalArticles
+    row_0:
+      totalArticles: 47
+- id: gdpr_clause_count
+  category: clause_lookup
+  difficulty: easy
+  question: How many clauses does GDPR have?
+  expected_cypher: 'MATCH (r:Regulation {regulationId: ''GDPR''})-[:HAS_CLAUSE]->(c:Clause)
+    RETURN count(c) AS clauseCount'
+  expected_result:
+    row_count: 1
+    columns:
+    - clauseCount
+- id: find_risk_management_clauses
+  category: clause_lookup
+  difficulty: medium
+  question: Find all clauses that mention 'risk management' in their description
+  expected_cypher: MATCH (c:Clause) WHERE toLower(c.description) CONTAINS 'risk management'
+    RETURN c.clauseId AS clauseId, c.regulationId AS regulation, c.description AS
+    description
+  expected_result:
+    row_count: null
+    columns:
+    - clauseId
+    - regulation
+    - description
+- id: cra_high_ni_clauses
+  category: clause_lookup
+  difficulty: medium
+  question: List all CRA clauses with normative intensity 3 (SHALL)
+  expected_cypher: 'MATCH (r:Regulation {regulationId: ''CRA''})-[:HAS_CLAUSE]->(c:Clause
+    {normativeIntensity: 3}) RETURN c.clauseId, c.description, c.obligationType ORDER
+    BY c.clauseId'
+  expected_result:
+    row_count: null
+    columns:
+    - c.clauseId
+    - c.description
+    - c.obligationType
+- id: nis2_clause_details
+  category: clause_lookup
+  difficulty: medium
+  question: 'Show details of NIS2 clauses: ID, description, obligated party'
+  expected_cypher: 'MATCH (r:Regulation {regulationId: ''NIS2''})-[:HAS_CLAUSE]->(c:Clause)
+    RETURN c.clauseId AS clauseId, c.description AS description, c.obligatedParty
+    AS obligatedParty ORDER BY c.clauseId'
+  expected_result:
+    row_count: null
+    columns:
+    - clauseId
+    - description
+    - obligatedParty
+- id: dora_incident_clauses
+  category: clause_lookup
+  difficulty: medium
+  question: Find all DORA clauses related to incident reporting
+  expected_cypher: 'MATCH (r:Regulation {regulationId: ''DORA''})-[:HAS_CLAUSE]->(c:Clause)
+    WHERE toLower(c.description) CONTAINS ''incident'' OR toLower(c.description) CONTAINS
+    ''reporting'' RETURN c.clauseId, c.description ORDER BY c.clauseId'
+  expected_result:
+    row_count: null
+    columns:
+    - c.clauseId
+    - c.description
+- id: encryption_clauses
+  category: subdomain_mapping
+  difficulty: medium
+  question: Which clauses are mapped to encryption subdomains (D-01)?
+  expected_cypher: MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain) WHERE sd.subDomainId
+    STARTS WITH 'D-01' RETURN c.clauseId, c.regulationId, sd.name AS subdomain ORDER
+    BY c.clauseId
+  expected_result:
+    row_count: null
+    columns:
+    - c.clauseId
+    - c.regulationId
+    - subdomain
+- id: subdomain_clause_count
+  category: subdomain_mapping
+  difficulty: medium
+  question: Which subdomain has the most clauses mapped to it?
+  expected_cypher: MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain) RETURN sd.name AS
+    subdomain, count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 1
+  expected_result:
+    row_count: 1
+    columns:
+    - subdomain
+    - clauseCount
+- id: map_to_subdomain_details
+  category: subdomain_mapping
+  difficulty: medium
+  question: Show all clauses mapped to subdomain D-01-1 (Data at Rest Encryption)
+  expected_cypher: 'MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain {subDomainId: ''D-01-1''})
+    RETURN c.clauseId, c.regulationId, c.description ORDER BY c.regulationId'
+  expected_result:
+    row_count: null
+    columns:
+    - c.clauseId
+    - c.regulationId
+    - c.description
+- id: missing_subdomain_coverage
+  category: subdomain_mapping
+  difficulty: medium
+  question: Which subdomains have no clauses mapped to them?
+  expected_cypher: MATCH (sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd))
+    RETURN sd.subDomainId AS id, sd.name AS name
+  expected_result:
+    row_count: null
+    columns:
+    - id
+    - name
+- id: clause_distribution_per_regulation
+  category: cross_regulation
+  difficulty: medium
+  question: How many clauses does each regulation have?
+  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause) RETURN r.regulationId
+    AS regulation, count(c) AS clauseCount ORDER BY clauseCount DESC
+  expected_result:
+    row_count: 5
+    columns:
+    - regulation
+    - clauseCount
+- id: shared_subdomains_between_regulations
+  category: cross_regulation
+  difficulty: hard
+  question: Which subdomains have clauses from both GDPR and CRA?
+  expected_cypher: 'MATCH (c1:Clause {regulationId: ''GDPR''})-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPPED_TO]-(c2:Clause
+    {regulationId: ''CRA''}) RETURN sd.subDomainId, sd.name, count(c1) AS gdprCount,
+    count(c2) AS craCount ORDER BY sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - gdprCount
+    - craCount
+- id: regulations_covering_encryption
+  category: cross_regulation
+  difficulty: medium-hard
+  question: Which regulations have clauses covering encryption-related subdomains?
+  expected_cypher: MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain) WHERE sd.subDomainId
+    STARTS WITH 'D-01' RETURN DISTINCT c.regulationId AS regulation ORDER BY regulation
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+- id: clause_overlap_gdpr_cra
+  category: cross_regulation
+  difficulty: hard
+  question: How many clauses does GDPR share with CRA (mapped to the same subdomains)?
+  expected_cypher: 'MATCH (c1:Clause {regulationId: ''GDPR''})-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPPED_TO]-(c2:Clause
+    {regulationId: ''CRA''}) RETURN count(DISTINCT sd) AS sharedSubdomainCount'
+  expected_result:
+    row_count: 1
+    columns:
+    - sharedSubdomainCount
+- id: highest_ni_regulation
+  category: cross_regulation
+  difficulty: hard
+  question: Which regulation has the highest average normative intensity across its
+    clauses?
+  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause) RETURN r.regulationId
+    AS regulation, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
+  expected_result:
+    row_count: 5
+    columns:
+    - regulation
+    - avgNI
+- id: ni_distribution
+  category: normative_intensity
+  difficulty: medium
+  question: Show the distribution of clauses by normative intensity level
+  expected_cypher: MATCH (c:Clause) RETURN c.normativeIntensity AS ni, count(*) AS
+    clauseCount ORDER BY ni
+  expected_result:
+    row_count: 3
+    columns:
+    - ni
+    - clauseCount
+- id: highest_ni_clauses
+  category: normative_intensity
+  difficulty: medium
+  question: List all clauses with normative intensity 3, grouped by regulation
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause {normativeIntensity:
+    3}) RETURN r.regulationId AS regulation, count(c) AS count ORDER BY count DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - count
+- id: avg_ni_per_domain
+  category: normative_intensity
+  difficulty: hard
+  question: What is the average normative intensity of clauses per security domain?
+  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+    RETURN d.name AS domain, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
+  expected_result:
+    row_count: null
+    columns:
+    - domain
+    - avgNI
+- id: uncovered_subdomains
+  category: gap_analysis
+  difficulty: hard
+  question: Identify subdomains that have no clause coverage
+  expected_cypher: MATCH (sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd))
+    RETURN sd.subDomainId, sd.name, sd.gapRisk
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.gapRisk
+- id: gap_risk_analysis
+  category: gap_analysis
+  difficulty: hard
+  question: Which subdomains have high gap risk?
+  expected_cypher: MATCH (sd:SubDomain) WHERE sd.gapRisk = 'HIGH' RETURN sd.subDomainId,
+    sd.name, sd.soleAuthority
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.soleAuthority
+- id: sole_authority_subdomains
+  category: gap_analysis
+  difficulty: hard
+  question: Which subdomains are sole authority for a specific regulation?
+  expected_cypher: MATCH (sd:SubDomain) WHERE sd.soleAuthority IS NOT NULL AND sd.soleAuthority
+    <> '' RETURN sd.subDomainId, sd.name, sd.soleAuthority
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.soleAuthority
+- id: regulation_overlaps
+  category: complementarity
+  difficulty: hard
+  question: Which pairs of regulations have complementarity overlap?
+  expected_cypher: MATCH (ca:ComplementarityAnalysis) RETURN ca.regulation1Id AS reg1,
+    ca.regulation2Id AS reg2, ca.overlapType AS overlapType, ca.jaccardIndex ORDER
+    BY ca.jaccardIndex DESC
+  expected_result:
+    row_count: null
+    columns:
+    - reg1
+    - reg2
+    - overlapType
+    - ca.jaccardIndex
+- id: gdpr_cra_complementarity
+  category: complementarity
+  difficulty: hard
+  question: What is the complementarity analysis between GDPR and CRA?
+  expected_cypher: MATCH (ca:ComplementarityAnalysis) WHERE (ca.regulation1Id = 'GDPR'
+    AND ca.regulation2Id = 'CRA') OR (ca.regulation1Id = 'CRA' AND ca.regulation2Id
+    = 'GDPR') RETURN ca.overlapType, ca.jaccardIndex, ca.overlapDescription
+  expected_result:
+    row_count: null
+    columns:
+    - ca.overlapType
+    - ca.jaccardIndex
+    - ca.overlapDescription
+- id: conflict_between_regulations
+  category: complementarity
+  difficulty: hard
+  question: What conflicts are identified between regulations?
+  expected_cypher: MATCH (ca:ComplementarityAnalysis) WHERE ca.conflictDescription
+    IS NOT NULL AND ca.conflictDescription <> '' RETURN ca.regulation1Id, ca.regulation2Id,
+    ca.conflictDescription
+  expected_result:
+    row_count: null
+    columns:
+    - ca.regulation1Id
+    - ca.regulation2Id
+    - ca.conflictDescription
+- id: most_critical_clauses
+  category: complex_reasoning
+  difficulty: hard
+  question: Identify the most critical clauses (NI=3) across all regulations and their
+    subdomain coverage
+  expected_cypher: 'MATCH (c:Clause {normativeIntensity: 3})-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN c.regulationId AS regulation, count(c) AS criticalCount, collect(sd.name)[0..3]
+    AS subdomains ORDER BY criticalCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - criticalCount
+    - subdomains
+- id: regulation_coverage_by_domain
+  category: complex_reasoning
+  difficulty: hard
+  question: Show which regulations provide the most coverage across security domains
+  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain)
+    RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount
+    ORDER BY domain, clauseCount DESC
+  expected_result:
+    row_count: null
+    columns:
+    - domain
+    - regulation
+    - clauseCount
+- id: article_clause_count
+  category: clause_lookup
+  difficulty: medium
+  question: How many clauses does each article of GDPR contain?
+  expected_cypher: 'MATCH (c:Clause {regulationId: ''GDPR''}) RETURN c.articleReference AS article,
+    count(c) AS clauseCount ORDER BY clauseCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - article
+    - clauseCount
+- id: article_with_most_clauses
+  category: clause_lookup
+  difficulty: medium
+  question: Which article has the most clauses defined across all regulations?
+  expected_cypher: 'MATCH (c:Clause) RETURN c.articleReference AS article, c.regulationId AS regulation,
+    count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 5'
+  expected_result:
+    row_count: 5
+    columns:
+    - article
+    - regulation
+    - clauseCount
+- id: articles_without_clauses
+  category: gap_analysis
+  difficulty: hard
+  question: Which articles have no clauses defined?
+  expected_cypher: MATCH (a:Article) WHERE NOT EXISTS((a)-[:DEFINES]->(:Clause)) RETURN
+    a.articleId, a.title
+  expected_result:
+    row_count: null
+    columns:
+    - a.articleId
+    - a.title
+- id: list_nist_functions
+  category: nist_retrieval
+  difficulty: easy
+  question: List all NIST CSF 2.0 functions
+  expected_cypher: 'MATCH (fc:FrameworkCategory {type: ''FUNCTION''}) RETURN fc.categoryId
+    AS id, fc.name AS name ORDER BY fc.categoryId'
+  expected_result:
+    row_count: 6
+    columns:
+    - id
+    - name
+- id: count_nist_controls
+  category: nist_retrieval
+  difficulty: easy
+  question: How many NIST CSF 2.0 controls are there?
+  expected_cypher: 'MATCH (fc:FrameworkControl) RETURN count(fc) AS totalControls'
+  expected_result:
+    row_count: 1
+    columns:
+    - totalControls
+    row_0:
+      totalControls: 106
+- id: nist_controls_by_function
+  category: nist_retrieval
+  difficulty: medium
+  question: How many controls does each NIST function have?
+  expected_cypher: 'MATCH (fc:FrameworkControl) RETURN fc.functionCode AS function,
+    count(fc) AS controlCount ORDER BY controlCount DESC'
+  expected_result:
+    row_count: 6
+    columns:
+    - function
+    - controlCount
+- id: protect_function_controls
+  category: nist_retrieval
+  difficulty: medium
+  question: List all controls for the Protect function
+  expected_cypher: 'MATCH (fc:FrameworkControl {functionCode: ''PR''}) RETURN fc.controlId,
+    fc.title, fc.categoryId ORDER BY fc.controlId'
+  expected_result:
+    row_count: null
+    columns:
+    - fc.controlId
+    - fc.title
+    - fc.categoryId
+- id: nist_cover_subdomain
+  category: unified_mapping
+  difficulty: medium
+  question: Show all NIST controls that map to subdomain D-01-1
+  expected_cypher: 'MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain
+    {subDomainId: ''D-01-1''}) RETURN fc.controlId, fc.title, fc.categoryId ORDER
+    BY fc.controlId'
+  expected_result:
+    row_count: null
+    columns:
+    - fc.controlId
+    - fc.title
+    - fc.categoryId
+- id: nist_uncovered_subdomains
+  category: unified_gap_analysis
+  difficulty: hard
+  question: Which subdomains have no NIST control coverage?
+  expected_cypher: MATCH (sd:SubDomain) WHERE NOT EXISTS((:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd))
+    RETURN sd.subDomainId, sd.name
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+- id: unified_subdomain_coverage
+  category: unified_mapping
+  difficulty: hard
+  question: Which subdomains have both regulatory clauses and NIST controls?
+  expected_cypher: MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
+    RETURN sd.name AS subdomain, count(DISTINCT c) AS clauseCount, count(DISTINCT
+    fc) AS nistCount ORDER BY clauseCount DESC
+  expected_result:
+    row_count: null
+    columns:
+    - subdomain
+    - clauseCount
+    - nistCount
+- id: gdpr_nist_overlap
+  category: unified_mapping
+  difficulty: hard
+  question: Where do GDPR clauses and NIST controls share the same subdomain?
+  expected_cypher: 'MATCH (c:Clause {regulationId: ''GDPR''})-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
+    RETURN sd.name AS subdomain, count(c) AS gdprClauses, count(DISTINCT fc) AS nistControls
+    ORDER BY gdprClauses DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - subdomain
+    - gdprClauses
+    - nistControls
+- id: nist_coverage_by_domain
+  category: unified_mapping
+  difficulty: hard
+  question: How many NIST controls cover each AEGIS domain?
+  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
+    RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
+  expected_result:
+    row_count: null
+    columns:
+    - domain
+    - nistCount
+- id: regulatory_vs_nist_gap
+  category: unified_gap_analysis
+  difficulty: hard
+  question: Which subdomains have regulatory coverage but no NIST coverage?
+  expected_cypher: MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain) WHERE NOT EXISTS((:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd))
+    RETURN sd.subDomainId, sd.name, count(c) AS clauseCount ORDER BY clauseCount DESC
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - clauseCount
+- id: nist_high_coverage_subdomains
+  category: unified_mapping
+  difficulty: hard
+  question: Which subdomains have the most NIST controls mapped to them?
+  expected_cypher: MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain)
+    RETURN sd.name AS subdomain, count(fc) AS nistCount ORDER BY nistCount DESC LIMIT
+    10
+  expected_result:
+    row_count: 10
+    columns:
+    - subdomain
+    - nistCount
+- id: nist_subcategory_controls
+  category: nist_retrieval
+  difficulty: medium
+  question: List all controls in the PR.DS (Data Security) category
+  expected_cypher: 'MATCH (fc:FrameworkControl {frameworkId: ''NIST_CSF_2_0'', categoryId:
+    ''PR.DS''}) RETURN fc.controlId, fc.description ORDER BY fc.controlId'
+  expected_result:
+    row_count: null
+    columns:
+    - fc.controlId
+    - fc.description

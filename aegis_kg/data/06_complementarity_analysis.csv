@@ -1,0 +1,2 @@
+analysisId,regulation1Id,regulation2Id,overlapType,jaccardIndex,overlapDescription,complementarityDescription,conflictDescription,recommendedApproach,analysisDate,analyst
+GDPR-CRA-001,GDPR,CRA,COMPLEMENTARY,0.367,Both regulations require data protection, encryption, and security controls,GDPR focuses on privacy rights, CRA focuses on product security,None,Implement both sets of controls, prioritize GDPR for data subjects rights,2024-01-20,Compliance Lead

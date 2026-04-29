@@ -1,0 +1,58 @@
+{
+  "timestamp": "20260427_182555",
+  "tasks_file": "aegis_eval/task_bank.yaml",
+  "trials": 1,
+  "total_trials": 1,
+  "by_category": {
+    "basic_retrieval": {
+      "count": 1,
+      "avg_scores": {
+        "cypher_quality": 3.0,
+        "retrieval_accuracy": 1.0,
+        "answer_quality": 1.0,
+        "regulatory_reasoning": 2.0
+      }
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "count": 1,
+      "avg_scores": {
+        "cypher_quality": 3.0,
+        "retrieval_accuracy": 1.0,
+        "answer_quality": 1.0,
+        "regulatory_reasoning": 2.0
+      }
+    }
+  },
+  "by_score": {
+    "cypher_quality": {
+      "avg": 3.0,
+      "min": 3,
+      "max": 3
+    },
+    "retrieval_accuracy": {
+      "avg": 1.0,
+      "min": 1,
+      "max": 1
+    },
+    "answer_quality": {
+      "avg": 1.0,
+      "min": 1,
+      "max": 1
+    },
+    "regulatory_reasoning": {
+      "avg": 2.0,
+      "min": 2,
+      "max": 2
+    }
+  },
+  "avg_latency_ms": {
+    "cypher_gen": 4509.845733642578,
+    "execution": 0.8604526519775391,
+    "answer_gen": 2058.377742767334,
+    "judge": 5743.467569351196,
+    "total": 12312.576293945312
+  },
+  "pass_rate": 0.0
+}
