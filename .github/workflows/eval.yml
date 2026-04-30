@@ -1,0 +1,90 @@
+name: AEGIS KG Eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run (leave empty to run all)'
+        required: false
+        type: string
+      trials:
+        description: 'Number of trials per task'
+        required: false
+        default: '1'
+        type: string
+
+env:
+  NEO4J_URI: http://localhost:7474
+  NEO4J_USER: neo4j
+  NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+  OLLAMA_BASE_URL: http://localhost:11434
+  OLLAMA_MODEL: ministral-3:latest
+  LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+  LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+  LANGFUSE_BASE_URL: http://localhost:3000
+  MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      neo4j:
+        image: neo4j:5.18.1-community
+        ports:
+          - 7474:7474
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/d3fendtest
+        options: >-
+          --health-cmd "curl http://localhost:7474"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r aegis_agents/requirements.txt
+          pip install -r aegis_eval/requirements.txt
+
+      - name: Wait for Neo4j
+        run: sleep 15
+
+      - name: Wait for Ollama
+        run: sleep 10
+
+      - name: Pull Ollama model
+        run: docker exec ${{ job.container }} ollama pull ministral-3:latest || ollama pull ministral-3:latest
+        continue-on-error: true
+
+      - name: Run evaluation
+        run: |
+          if [ -n "${{ inputs.task }}" ]; then
+            python aegis_eval/run_eval.py --tasks aegis_eval/task_bank.yaml --task ${{ inputs.task }} --trials ${{ inputs.trials || '1' }} --verbose
+          else
+            python aegis_eval/run_eval.py --tasks aegis_eval/task_bank.yaml --trials ${{ inputs.trials || '1' }} --verbose
+          fi
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: aegis_eval/results/
+          retention-days: 7

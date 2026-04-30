@@ -1,7 +1,7 @@
 # AGENTS.md — AEGIS Knowledge Graph Unified
 
-**Version:** 2.0  
-**Last Updated:** 2026-04-28  
+**Version:** 2.1
+**Last Updated:** 2026-04-29  
 **Purpose:** Canonical reference for AI coding agents working on this project.
 
 ---
@@ -79,9 +79,9 @@ aegis-kg-unified/
 ## 4. Module Divisions
 
 ### 4.1 `aegis_kg` — Knowledge Graph
-- **Schema** (`schema/01_create_schema.cypher`) defines 7+ node labels, constraints, indexes.
+- **Schema** (`schema/01_create_schema.cypher`) defines node labels, constraints, indexes.
 - **ETL** scripts must be run in numerical order (see §5.1).
-- **API** (`api/app.py`) provides 14+ operational Phase-1 endpoints; Phase-2/3 endpoints exist but return empty arrays because the data was never loaded.
+- **API** (`api/app.py`) provides Phase-1 endpoints; Phase-2/3 endpoints return empty arrays because Obligation/Goal/Rule nodes were never loaded. However, `StrategicTension` (4 nodes) and `ApplicabilityCondition` (12 nodes) DO exist in the graph.
 - **Validation** (`validation/01_validate_phase1.py`) is a standalone script that batched-queries Neo4j and asserts counts, constraints, relationship integrity, and API health.
 
 ### 4.2 `aegis_agents` — LangGraph Agent
@@ -114,10 +114,10 @@ export LANGFUSE_BASE_URL=http://localhost:3000
 # Minimax (judge)
 export MINIMAX_API_KEY=sk-cp-...
 
-# Neo4j
+# Neo4j (external container: d3fend-neo4j, password: d3fendtest)
 export NEO4J_URI=http://localhost:7474
 export NEO4J_USER=neo4j
-export NEO4J_PASSWORD=YOUR_NEO4J_PASSWORD
+export NEO4J_PASSWORD=d3fendtest
 
 # Ollama
 export OLLAMA_BASE_URL=http://localhost:11434
