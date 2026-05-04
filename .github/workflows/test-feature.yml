@@ -1,0 +1,175 @@
+name: Test Feature Branch
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [ opened, synchronize, reopened ]
+
+env:
+  NEO4J_URI: http://localhost:7474
+  NEO4J_USER: neo4j
+  NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+  OLLAMA_BASE_URL: http://localhost:11434
+  OLLAMA_MODEL: ministral-3:latest
+  LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+  LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+  LANGFUSE_BASE_URL: http://localhost:3000
+  MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+
+jobs:
+  test-quick:
+    name: Quick Test (5 tasks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      neo4j:
+        image: neo4j:5.18.1-community
+        ports:
+          - 7474:7474
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/d3fendtest
+        options: >-
+          --health-cmd "curl http://localhost:7474"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r aegis_agents/requirements.txt
+          pip install -r aegis_eval/requirements.txt
+
+      - name: Wait for Neo4j
+        run: sleep 15
+
+      - name: Pull Ollama model
+        run: docker exec ${{ job.container }} ollama pull ministral-3:latest || ollama pull ministral-3:latest
+        continue-on-error: true
+
+      - name: Create test tasks file
+        run: |
+          cat > /tmp/quick_tasks.yaml << 'EOF'
+          tasks:
+          - id: list_all_regulations
+            category: basic_retrieval
+            question: List all regulations in the knowledge graph
+          - id: count_total_clauses
+            category: basic_retrieval
+            question: How many clauses are there in total?
+          - id: gdpr_clause_count
+            category: clause_lookup
+            question: How many clauses does GDPR have?
+          - id: shared_subdomains_between_regulations
+            category: cross_regulation
+            question: Which subdomains have clauses from both GDPR and CRA?
+          - id: nist_controls_by_function
+            category: nist_retrieval
+            question: How many controls does each NIST function have?
+          EOF
+
+      - name: Run quick evaluation
+        id: eval
+        run: |
+          PYTHONPATH=. python3 aegis_eval/run_eval.py --tasks /tmp/quick_tasks.yaml --trials 1
+
+      - name: Get latest result file
+        id: results
+        run: |
+          RESULT_FILE=$(ls -t aegis_eval/results/summary_*.json | head -1)
+          echo "result_file=$RESULT_FILE" >> $GITHUB_OUTPUT
+          echo "Result file: $RESULT_FILE"
+
+      - name: Compare with baseline
+        id: comparison
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import sys
+          import os
+
+          baseline_file = "aegis_eval/results/baseline_stable_v1.json"
+          result_file = os.environ.get('GITHUB_OUTPUT', '')
+          current_file = None
+
+          # Find the most recent result file
+          import glob
+          files = sorted(glob.glob('aegis_eval/results/summary_*.json'))
+          if files:
+            current_file = files[-1]
+
+          if not current_file:
+            print("No result file found")
+            sys.exit(1)
+
+          try:
+            baseline = json.load(open(baseline_file))
+            current = json.load(open(current_file))
+          except Exception as e:
+            print(f"Error loading files: {e}")
+            sys.exit(1)
+
+          baseline_pr = baseline.get("pass_rate", 0) * 100
+          current_pr = current.get("pass_rate", 0) * 100
+
+          print(f"Baseline pass rate:  {baseline_pr:.1f}%")
+          print(f"Current pass rate:   {current_pr:.1f}%")
+
+          # Set GitHub Actions output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"baseline_pr={baseline_pr:.1f}\n")
+            f.write(f"current_pr={current_pr:.1f}\n")
+
+          threshold = 85.0
+          if current_pr >= threshold:
+            print(f"::notice::Test passed: {current_pr:.1f}% >= {threshold}%")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write("result=PASS\n")
+            sys.exit(0)
+          else:
+            print(f"::error::Test failed: {current_pr:.1f}% < {threshold}%")
+            print("")
+            print("Dimension comparison:")
+            for dim in baseline.get("by_dimension", {}):
+              b_avg = baseline["by_dimension"][dim].get("overall_avg", 0)
+              c_avg = current.get("by_dimension", {}).get(dim, {}).get("overall_avg", 0)
+              diff = c_avg - b_avg
+              if diff < -0.5:
+                status = "REGRESSION"
+              elif diff < 0:
+                status = "SLIGHT_DROP"
+              else:
+                status = "OK"
+              print(f"  {dim}: {b_avg:.2f} → {c_avg:.2f} ({diff:+.2f}) [{status}]")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write("result=FAIL\n")
+            sys.exit(1)
+          PYEOF
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quick-test-results
+          path: aegis_eval/results/
+          retention-days: 7
+
+      - name: Post result comment
+        if: always()
+        run: |
+          result="${{ steps.comparison.outputs.result }}"
+          baseline_pr="${{ steps.comparison.outputs.baseline_pr }}"
+          current_pr="${{ steps.comparison.outputs.current_pr }}"
+          echo "Test result: $result"
+          echo "Baseline: $baseline_pr%, Current: $current_pr%"

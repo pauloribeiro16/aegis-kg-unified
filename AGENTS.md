@@ -1,10 +1,26 @@
 # AGENTS.md — AEGIS Knowledge Graph Unified
 
-**Version:** 2.1
-**Last Updated:** 2026-04-29  
+**Version:** 2.2
+**Last Updated:** 2026-05-04
 **Purpose:** Canonical reference for AI coding agents working on this project.
 
 ---
+
+## ⚠️ AVISO OBRIGATÓRIO — WORKFLOW DE DESENVOLVIMENTO
+
+**Se queres adicionar algo novo ao projeto:**
+
+1. ❌ **NÃO faças alterações diretamente na branch `master`**
+2. ✅ **CORRE primeiro:** `./scripts/create-feature.sh "nome-da-feature"`
+3. ✅ **TRABALHA na branch** `feature/nome-da-feature`
+4. ✅ **TESTA com:** `./scripts/test-quick.sh`
+5. ✅ **SÓ faz merge para `master` depois de passar nos testes**
+
+**A branch `master` é sagrada — está sempre estável com o baseline guardado.**
+
+---
+
+**Version:** 2.2
 
 ## 1. Project Overview
 
