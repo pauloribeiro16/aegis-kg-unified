@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 NEO4J = {
     "http_url": os.getenv("NEO4J_URI", "http://localhost:7474"),
