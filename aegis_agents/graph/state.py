@@ -21,3 +21,4 @@ class AgentState(TypedDict):
     fallback_used: bool
     total_latency_ms: float
     degraded_mode: bool
+    verbose: bool

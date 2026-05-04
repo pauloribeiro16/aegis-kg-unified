@@ -1,6 +1,8 @@
 """Configuration for AEGIS Agents."""
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 NEO4J_CONFIG = {
     "http_url": os.getenv("NEO4J_URI", "http://localhost:7474"),

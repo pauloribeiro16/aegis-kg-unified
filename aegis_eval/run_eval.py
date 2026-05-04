@@ -65,8 +65,9 @@ def run_agent_task(question: str, verbose: bool = False) -> dict:
     try:
         from aegis_agents.agent import AegisAgent
 
-        agent = AegisAgent(max_attempts=3, use_tracing=True)
+        agent = AegisAgent(max_attempts=3, use_tracing=True, verbose=verbose)
         result = agent.run(question)
+        result["_verbose"] = verbose
         return result
     except Exception as e:
         return {
@@ -75,7 +76,8 @@ def run_agent_task(question: str, verbose: bool = False) -> dict:
             "steps": [],
             "success": False,
             "attempt_count": 0,
-            "error": str(e)
+            "error": str(e),
+            "_verbose": verbose
         }
 
 
@@ -90,24 +92,43 @@ def run_trial(
     question = task["question"]
 
     if verbose:
-        print(f"\n  === Trial {trial_num}: {task['id']} ===")
-        print(f"  Q: {question}")
+        print(f"\n  === Trial {trial_num}: {task['id']} ===", flush=True)
+        print(f"  Q: {question}", flush=True)
 
     t0 = time.time()
 
     if verbose:
-        print(f"  Running agent...")
+        print(f"  Running agent...", flush=True)
     agent_result = run_agent_task(question, verbose)
 
     if verbose:
-        print(f"  Agent done: success={agent_result.get('success')}, trace_id={agent_result.get('trace_id')}")
+        cypher = agent_result.get('cypher', 'N/A')
+        steps = agent_result.get('steps', [])
+        print(f"  Agent done: success={agent_result.get('success')}, trace_id={agent_result.get('trace_id')}", flush=True)
+        print(f"  Cypher: {cypher[:100] if cypher else 'N/A'}", flush=True)
+        print(f"  Steps: {len(steps)} attempts", flush=True)
 
     if verbose:
-        print(f"  Running Minimax judge...")
+        print(f"  Running Minimax judge...", flush=True)
     judge_result = judge_agent_result(task, agent_result)
 
     if verbose:
-        print(f"  Judge done: scores={bool(judge_result.get('scores'))}, error={judge_result.get('error')}")
+        avg_scores = {}
+        scores = judge_result.get("scores", {})
+        if scores:
+            dimensions = set()
+            for key in scores:
+                if key.endswith('_query') or key.endswith('_answer'):
+                    dim = key.rsplit('_', 1)[0]
+                    dimensions.add(dim)
+            for dim in dimensions:
+                q_score = scores.get(f"{dim}_query", 0)
+                a_score = scores.get(f"{dim}_answer", 0)
+                avg_scores[dim] = (q_score + a_score) / 2
+        print(f"  Judge done: scores={bool(scores)}, error={judge_result.get('error')}", flush=True)
+        if avg_scores:
+            dim_str = " ".join([f"{k[:4]}={v:.1f}" for k, v in avg_scores.items()])
+            print(f"  Scores: {dim_str}", flush=True)
 
     latency = (time.time() - t0) * 1000
 
@@ -251,11 +272,26 @@ def run_eval(
         print(f"ERROR: Task '{task_filter}' not found in task bank.")
         return []
 
-    print(f"\nRunning eval: {len(filtered_tasks)} tasks x {trials} trial(s)")
+    total_trials = len(filtered_tasks) * trials
+    print(f"\nRunning eval: {len(filtered_tasks)} tasks x {trials} trial(s) = {total_trials} total")
 
     all_results = []
-    for task in filtered_tasks:
+    start_time = time.time()
+    for idx, task in enumerate(filtered_tasks, 1):
         for trial_num in range(1, trials + 1):
+            trial_idx = (idx - 1) * trials + trial_num
+            elapsed = time.time() - start_time
+            if trial_idx > 1:
+                eta_sec = (elapsed / (trial_idx - 1)) * (total_trials - trial_idx + 1)
+                eta_str = f"{int(eta_sec // 60)}m {int(eta_sec % 60)}s"
+            else:
+                eta_str = "calculating..."
+
+            if verbose:
+                print(f"\n[{trial_idx}/{total_trials}] {task['id']} — ETA: {eta_str}", flush=True)
+            else:
+                print(f"[{trial_idx}/{total_trials}] {task['id']}", end="\r", flush=True)
+
             result = run_trial(task, trial_num, langfuse, verbose)
             all_results.append(result)
 
