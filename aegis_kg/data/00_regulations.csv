@@ -3,4 +3,4 @@ GDPR,GDPR,General Data Protection Regulation 2016/679,DATA_PROTECTION,2018-05-25
 CRA,CRA,Cyber Resilience Act (EU) 2022/2554,CYBER_SECURITY,2024-12-12,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022PC2554,Digital product security
 NIS2,NIS 2,Network and Information Systems Directive (EU) 2022/2555,CRITICAL_INFRA,2023-01-16,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022PC2555,Critical infrastructure security
 DORA,DORA,Digital Operational Resilience Act,FINANCIAL,2025-01-17,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023PC0464,Financial sector resilience
-AI_ACT,AI Act,Artificial Intelligence Act,AI_REGULATION,2025-08-01,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023PC0460,High-risk AI systems
+AIACT,AI Act,Artificial Intelligence Act,AI_REGULATION,2025-08-01,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023PC0460,High-risk AI systems
