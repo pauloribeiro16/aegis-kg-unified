@@ -142,8 +142,8 @@ tasks:
 - id: map_to_subdomain_details
   category: subdomain_mapping
   difficulty: medium
-  question: Show all clauses mapped to subdomain D-01-1 (Data at Rest Encryption)
-  expected_cypher: 'MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain {subDomainId: ''D-01-1''})
+  question: Show all clauses mapped to subdomain D-01.1 (Data at Rest Encryption)
+  expected_cypher: 'MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain {subDomainId: ''D-01.1''})
     RETURN c.clauseId, c.regulationId, c.description ORDER BY c.regulationId'
   expected_result:
     row_count: null
@@ -245,7 +245,7 @@ tasks:
   category: normative_intensity
   difficulty: hard
   question: What is the average normative intensity of clauses per security domain?
-  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+  expected_cypher: MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
     RETURN d.name AS domain, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
   expected_result:
     row_count: null
@@ -346,7 +346,7 @@ tasks:
   category: complex_reasoning
   difficulty: hard
   question: Show which regulations provide the most coverage across security domains
-  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain)
+  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:CONTAINS]-(d:Domain)
     RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount
     ORDER BY domain, clauseCount DESC
   expected_result:
@@ -370,13 +370,11 @@ tasks:
   category: clause_lookup
   difficulty: medium
   question: Which article has the most clauses defined across all regulations?
-  expected_cypher: 'MATCH (c:Clause) RETURN c.articleReference AS article, c.regulationId AS regulation,
-    count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 5'
+  expected_cypher: 'MATCH (c:Clause) WHERE c.articleReference IS NOT NULL RETURN c.articleReference AS article, count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 5'
   expected_result:
     row_count: 5
     columns:
     - article
-    - regulation
     - clauseCount
 - id: articles_without_clauses
   category: gap_analysis
@@ -437,9 +435,9 @@ tasks:
 - id: nist_cover_subdomain
   category: unified_mapping
   difficulty: medium
-  question: Show all NIST controls that map to subdomain D-01-1
+  question: Show all NIST controls that map to subdomain D-01.1
   expected_cypher: 'MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain
-    {subDomainId: ''D-01-1''}) RETURN fc.controlId, fc.title, fc.categoryId ORDER
+    {subDomainId: ''D-01.1''}) RETURN fc.controlId, fc.title, fc.categoryId ORDER
     BY fc.controlId'
   expected_result:
     row_count: null
@@ -488,7 +486,7 @@ tasks:
   category: unified_mapping
   difficulty: hard
   question: How many NIST controls cover each AEGIS domain?
-  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
+  expected_cypher: MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
     RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
   expected_result:
     row_count: null

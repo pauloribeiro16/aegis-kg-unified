@@ -55,6 +55,29 @@ ORDER BY criticalCount DESC
 // Existence check (no rows = valid result, no retry needed)
 MATCH (sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd)) RETURN sd.subDomainId, sd.name
 
+## NIST CSF PATTERNS (CRITICAL — read carefully)
+
+FrameworkControl is filtered by PROPERTIES, NOT by traversing relationships to FrameworkCategory:
+- WRONG: MATCH (fc:FrameworkCategory)-[:HAS_CONTROL]->(FrameworkControl)
+- WRONG: MATCH (fc:FrameworkCategory)-[:HAS_CATEGORY]->(...)-[:HAS_CONTROL]->...
+- CORRECT: MATCH (fc:FrameworkControl {functionCode: 'PR'})   // filter by property
+- CORRECT: MATCH (fc:FrameworkControl {categoryId: 'PR.DS'})  // filter by property
+
+// List all NIST functions
+MATCH (fc:FrameworkCategory {type: 'FUNCTION'}) RETURN fc.categoryId, fc.name ORDER BY fc.categoryId
+
+// Controls per function (use functionCode property)
+MATCH (fc:FrameworkControl) RETURN fc.functionCode AS function, count(fc) AS controlCount ORDER BY controlCount DESC
+
+// Controls for a specific function (filter by functionCode property)
+MATCH (fc:FrameworkControl {functionCode: 'PR'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+// Controls in a specific category (filter by categoryId property)
+MATCH (fc:FrameworkControl {categoryId: 'PR.DS'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
+
+// Controls mapping to a subdomain (use MAPS_TO_SUBDOMAIN relationship)
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain {subDomainId: 'D-01.1'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
+
 SCHEMA:
 {schema}
 

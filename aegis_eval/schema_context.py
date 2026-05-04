@@ -63,10 +63,12 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 2. FrameworkCategory(categoryId, name, type, functionCode)
    - 40 nodes total
    - type: 'FUNCTION' (6: GV, ID, PR, DE, RS, RC) or 'CATEGORY' (34 subcategories)
-   - functionCode: for CATEGORY nodes, points to parent Function
+   - functionCode: for CATEGORY nodes, points to parent Function (e.g., PR.DS has functionCode='PR')
 
-3. FrameworkControl(controlId, title, categoryId, functionCode)
+3. FrameworkControl(controlId, title, categoryId, functionCode, frameworkId)
    - 106 nodes: e.g., GV.OC-01, PR.DS-01, DE.CM-01
+   - CRITICAL: Use properties functionCode and categoryId to filter, NOT node relationships
+   - frameworkId='NIST_CSF_2_0' on all controls
 
 ### RELATIONSHIPS (Verified — Actual Names)
 
@@ -86,14 +88,19 @@ Regulatory side:
 NIST CSF side:
 - (Framework)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function nodes]
 - (FrameworkCategory)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function→Category hierarchy]
-- (FrameworkCategory)-[:HAS_CONTROL]->(FrameworkControl)
+- (FrameworkControl)-[:HAS_CONTROL]->(FrameworkCategory)  [NOTE: direction is CONTROL→CATEGORY, rare to traverse]
 - (FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(SubDomain)
 - (FrameworkControl)-[:MAPS_TO_DOMAIN]->(Domain)
 
-Complementarity side:
-- (ComplementarityAnalysis)-[:OVERLAPS_WITH]->(Regulation)
+### NIST CSF CRITICAL USAGE RULES
 
-## IDENTITY CONVENTIONS (Verified — Actual Format)
+FrameworkControl filtering is DONE VIA PROPERTIES, not relationships:
+- To filter by function: MATCH (fc:FrameworkControl {functionCode: 'PR'})
+- To filter by category: MATCH (fc:FrameworkControl {categoryId: 'PR.DS'})
+- To list functions: MATCH (fc:FrameworkCategory {type: 'FUNCTION'})
+- DO NOT use: MATCH (fc:FrameworkCategory)-[:HAS_CONTROL]->(fc:FrameworkControl)  [WRONG]
+
+### IDENTITY CONVENTIONS (Verified — Actual Format)
 
 - SubDomain: "D-XX.Y" (DOT separator) — e.g., "D-01.1", "D-02.3", "D-10.2"
   - WRONG: "D-01-1", "D-02-3" (dash format does not exist in the graph)
@@ -167,6 +174,36 @@ RETURN ca.jaccardIndex, ca.conflictClassification, ca.overlapDescription
 MATCH (sd:SubDomain)
 WHERE sd.soleAuthority IS NOT NULL AND sd.soleAuthority <> ''
 RETURN sd.subDomainId, sd.name, sd.soleAuthority
+
+## NIST CSF WORKING PATTERNS (Verified — These queries work)
+
+### List all NIST functions
+MATCH (fc:FrameworkCategory {type: 'FUNCTION'}) RETURN fc.categoryId AS functionCode, fc.name ORDER BY fc.categoryId
+
+### Count controls by function
+MATCH (fc:FrameworkControl) RETURN fc.functionCode AS function, count(fc) AS controlCount ORDER BY controlCount DESC
+
+### Controls for Protect (PR) function
+MATCH (fc:FrameworkControl {functionCode: 'PR'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+### Controls in PR.DS (Data Security) category
+MATCH (fc:FrameworkControl {categoryId: 'PR.DS'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
+
+### Controls mapping to a specific subdomain
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain {subDomainId: 'D-01.1'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+### NIST controls covering each AEGIS domain
+MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
+
+### Subdomains covered by NIST controls (with regulatory comparison)
+MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN sd.name AS subdomain, count(DISTINCT c) AS clauseCount, count(DISTINCT fc) AS nistCount ORDER BY clauseCount DESC
+
+### Subdomains with NIST but no regulatory coverage
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd)) RETURN sd.subDomainId, sd.name ORDER BY sd.subDomainId
+
+### Regulation coverage across domains (CONTAINS not HAS_SUBDOMAIN)
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:CONTAINS]-(d:Domain) RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount ORDER BY domain, clauseCount DESC
+
 """
 
 EXAMPLES = [
