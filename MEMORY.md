@@ -642,3 +642,28 @@ agent_eval_{task_id} (L0 — CallbackHandler)
 - Container running normally
 
 **Next step:** Run a task and verify traces appear in Langfuse UI at http://localhost:3000
+
+---
+
+## Minimax LangChain vs Direct Requests - 2026-05-04
+
+### Error: LangChain MiniMaxChat fails with "Invalid API Key Provided"
+**Symptom:** `Invalid API Key Provided` when using LangChain `MiniMaxChat`, but direct `requests.post` works fine with the same API key.
+
+**Root Cause:** LangChain `MiniMaxChat` uses a cached HTTP client (`httpx.Client`) inside `_generate()`. On some environments, the client instance may not properly send the Authorization header despite the key being set correctly in `MiniMaxChat.minimax_api_key`. The direct HTTP request via `requests.post` always works.
+
+**Debug findings:**
+- API key length: 125 chars (correct)
+- Host: `https://api.minimaxi.chat/v1/text/chatcompletion_v2` (correct)
+- Direct `requests.post` with same key/headers: ✅ Works
+- LangChain `MiniMaxChat.invoke()`: ❌ `Invalid API Key Provided` after 0.7-1.2s
+
+**Solution:** Replaced LangChain `MiniMaxChat` with direct `requests.post` in `aegis_eval/minimax_client.py`. Direct HTTP is more reliable and has fewer dependencies.
+
+**Changes:**
+- `aegis_eval/minimax_client.py` - Complete rewrite using `requests.post` instead of `langchain_community.chat_models.MiniMaxChat`
+- Uses `https://api.minimaxi.chat/v1/text/chatcompletion_v2` directly
+- Model name: `MiniMax-M2.7` (case sensitive)
+- `max_tokens=4096`, `temperature=0.1`, `top_p=0.95`
+
+**Date:** 2026-05-04

@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from dotenv import load_dotenv
+load_dotenv()
 
 from aegis_eval.config import LANGFUSE, MINIMAX
 from aegis_eval.minimax_judge import judge_agent_result
@@ -63,6 +65,10 @@ def get_langfuse_client():
 def run_agent_task(question: str, verbose: bool = False) -> dict:
     """Run a task through the LangGraph agent."""
     try:
+        import os
+        key_len = len(os.getenv("MINIMAX_API_KEY", ""))
+        print(f"  [DEBUG] run_agent_task: MINIMAX_API_KEY len={key_len}", flush=True)
+
         from aegis_agents.agent import AegisAgent
 
         agent = AegisAgent(max_attempts=3, use_tracing=True, verbose=verbose)

@@ -80,7 +80,9 @@ def judge_agent_result(task: dict, agent_result: dict) -> dict:
     system_prompt, user_prompt = get_evaluation_prompt(task, agent_result)
 
     if verbose:
+        import os
         print(f"[judge] Calling Minimax M2.7 (prompt: {len(user_prompt)} chars)...", flush=True)
+        print(f"[DEBUG] judge_agent_result: MINIMAX api_key len={len(MINIMAX.get('api_key', ''))}, os.getenv len={len(os.getenv('MINIMAX_API_KEY', ''))}", flush=True)
 
     # Call Minimax
     start = time.time()

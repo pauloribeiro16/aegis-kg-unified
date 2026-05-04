@@ -1,0 +1,193 @@
+{
+  "timestamp": "20260504_220439",
+  "tasks_file": "aegis_eval/task_bank.yaml",
+  "trials": 1,
+  "total_trials": 45,
+  "by_category": {
+    "complex_reasoning": {
+      "count": 2,
+      "avg_scores": {
+        "cypher_correctness": 3.5,
+        "query_effectiveness": 2.75,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 3.75,
+        "reasoning_quality": 3.5
+      }
+    },
+    "unified_mapping": {
+      "count": 5,
+      "avg_scores": {
+        "cypher_correctness": 3.3,
+        "query_effectiveness": 3.5,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.1,
+        "reasoning_quality": 3.3
+      }
+    },
+    "subdomain_mapping": {
+      "count": 4,
+      "avg_scores": {
+        "cypher_correctness": 4.375,
+        "query_effectiveness": 4.625,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.75,
+        "reasoning_quality": 4.875
+      }
+    },
+    "clause_lookup": {
+      "count": 7,
+      "avg_scores": {
+        "cypher_correctness": 3.5714285714285716,
+        "query_effectiveness": 3.5,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 3.857142857142857,
+        "reasoning_quality": 3.5714285714285716
+      }
+    },
+    "complementarity": {
+      "count": 3,
+      "avg_scores": {
+        "cypher_correctness": 3.5,
+        "query_effectiveness": 3.1666666666666665,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.166666666666667,
+        "reasoning_quality": 3.5
+      }
+    },
+    "nist_retrieval": {
+      "count": 5,
+      "avg_scores": {
+        "cypher_correctness": 3.4,
+        "query_effectiveness": 2.9,
+        "feedback_loop_benefit": 2.6,
+        "tool_usage": 3.5,
+        "reasoning_quality": 2.8
+      }
+    },
+    "basic_retrieval": {
+      "count": 5,
+      "avg_scores": {
+        "cypher_correctness": 4.4,
+        "query_effectiveness": 4.4,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.6,
+        "reasoning_quality": 4.4
+      }
+    },
+    "normative_intensity": {
+      "count": 3,
+      "avg_scores": {
+        "cypher_correctness": 3.5,
+        "query_effectiveness": 3.6666666666666665,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 3.5,
+        "reasoning_quality": 3.8333333333333335
+      }
+    },
+    "unified_gap_analysis": {
+      "count": 2,
+      "avg_scores": {
+        "cypher_correctness": 4.5,
+        "query_effectiveness": 4.5,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.75,
+        "reasoning_quality": 4.75
+      }
+    },
+    "gap_analysis": {
+      "count": 4,
+      "avg_scores": {
+        "cypher_correctness": 4.0,
+        "query_effectiveness": 3.75,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.125,
+        "reasoning_quality": 4.0
+      }
+    },
+    "cross_regulation": {
+      "count": 5,
+      "avg_scores": {
+        "cypher_correctness": 4.6,
+        "query_effectiveness": 4.1,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.5,
+        "reasoning_quality": 4.2
+      }
+    }
+  },
+  "by_difficulty": {
+    "hard": {
+      "count": 19,
+      "avg_scores": {
+        "cypher_correctness": 3.8684210526315788,
+        "query_effectiveness": 3.6315789473684212,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.184210526315789,
+        "reasoning_quality": 3.8157894736842106
+      }
+    },
+    "easy": {
+      "count": 8,
+      "avg_scores": {
+        "cypher_correctness": 4.25,
+        "query_effectiveness": 4.3125,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.5,
+        "reasoning_quality": 4.25
+      }
+    },
+    "medium": {
+      "count": 17,
+      "avg_scores": {
+        "cypher_correctness": 3.676470588235294,
+        "query_effectiveness": 3.5588235294117645,
+        "feedback_loop_benefit": 2.8823529411764706,
+        "tool_usage": 3.911764705882353,
+        "reasoning_quality": 3.676470588235294
+      }
+    },
+    "medium-hard": {
+      "count": 1,
+      "avg_scores": {
+        "cypher_correctness": 4.0,
+        "query_effectiveness": 3.5,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.0,
+        "reasoning_quality": 3.5
+      }
+    }
+  },
+  "by_dimension": {
+    "cypher_correctness": {
+      "query_avg": 3.466666666666667,
+      "answer_avg": 4.266666666666667,
+      "overall_avg": 3.8666666666666667
+    },
+    "query_effectiveness": {
+      "query_avg": 3.511111111111111,
+      "answer_avg": 3.933333333333333,
+      "overall_avg": 3.7222222222222223
+    },
+    "feedback_loop_benefit": {
+      "query_avg": 2.9555555555555557,
+      "answer_avg": 2.9555555555555557,
+      "overall_avg": 2.9555555555555557
+    },
+    "tool_usage": {
+      "query_avg": 4.0,
+      "answer_avg": 4.266666666666667,
+      "overall_avg": 4.133333333333334
+    },
+    "reasoning_quality": {
+      "query_avg": 3.8666666666666667,
+      "answer_avg": 3.8,
+      "overall_avg": 3.8333333333333335
+    }
+  },
+  "avg_latency_ms": {
+    "agent": 16239.524748060438,
+    "judge": 28401.801798078748,
+    "total": 40598.8118701511
+  },
+  "pass_rate": 0.8444444444444444
+}
