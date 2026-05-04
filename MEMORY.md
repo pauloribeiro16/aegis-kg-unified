@@ -390,6 +390,55 @@ temperature = 0.1
 
 ---
 
+## Minimax API URL - CRITICAL BUG (2026-05-04)
+
+**Symptom:** `status_code: 2049, status_msg: 'invalid api key'` despite correct API key
+**Root Cause:** URL was `https://api.minimax.chat/v1/text/chatcompletion_v2` (WRONG)
+**Correct URL:** `https://api.minimaxi.chat/v1/text/chatcompletion_v2` (note: minimaxi, not minimax)
+
+**Files affected:**
+- `aegis_eval/config.py` - MINIMAX["base_url"]
+- Any direct requests to Minimax API
+
+**Fix applied:**
+```python
+# WRONG (404 / 401 errors):
+MINIMAX["base_url"] = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+# CORRECT:
+MINIMAX["base_url"] = "https://api.minimaxi.chat/v1/text/chatcompletion_v2"
+```
+
+**Also fixed:**
+- `max_tokens` increased from 1024 to 4096 to prevent JSON truncation
+
+**Date:** 2026-05-04
+
+---
+
+## Minimax API Key Rotation (2026-05-04)
+
+**Old key (EXPOSED - DO NOT USE):**
+```
+sk-cp-yta9jJd1FoaX91wTwoVjoICfZm-wjFqKLccscXuVCdHp8huqOLAY_T6yScB3eO35cfxqBzXvlMYXfxQcPCOlDeBhkyTrMxGGwgv6UdICKK93Xi-_6dHubz4
+```
+
+**New key (ACTIVE):**
+```
+sk-cp-24bP-YWaZeAAxGreCrsknT1kugHnB2iJxcjJE7SgS65l-1Obghmn9_g_KSeNXtnUFaaMk37leZT84vW3EQd0CWo_fJuT9XaOfA0laK6GFJQKnshmT5MYWhg
+```
+
+**Files updated:**
+- `/home/epmq/Desktop/Projects/aegis-kg-unified/.env`
+- `/home/epmq/Desktop/Projects/Methodology-main/.env`
+- `/home/epmq/Desktop/Projects/artigos-lc/.env`
+- `/home/epmq/Desktop/Projects/aegis-kg-unified-BACKUP-20260429/.env.example`
+- `/home/epmq/Desktop/Projects/aegis-kg-unified-BACKUP-20260429/MEMORY.md`
+
+**Date:** 2026-05-04
+
+---
+
 ## Implementation Errors (2026-04-28)
 
 ### Error 1: Minimax API Key Invalid

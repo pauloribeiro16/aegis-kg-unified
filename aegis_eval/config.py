@@ -22,8 +22,8 @@ LANGFUSE = {
 MINIMAX = {
     "api_key": os.getenv("MINIMAX_API_KEY", ""),
     "model": "MiniMax-M2.7",
-    "base_url": "https://api.minimax.chat/v1/text/chatcompletion_v2",
-    "max_tokens": 1024,
+    "base_url": "https://api.minimaxi.chat/v1/text/chatcompletion_v2",
+    "max_tokens": 4096,
     "temperature": 0.1,
 }
 

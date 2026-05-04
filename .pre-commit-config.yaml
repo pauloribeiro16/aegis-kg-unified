@@ -1,8 +1,16 @@
 repos:
   - repo: local
     hooks:
+      - id: block-credential-patterns
+        name: Block Credential Patterns
+        entry: scripts/_block_secrets.sh
+        language: script
+        types: [text]
+        exclude: ^aegis_eval/results/|^\.secrets\.baseline$|^MEMORY\.md$|^aegis_kg/schema/00_setup_neo4j\.sh$|^docker-compose\.yml$
+
       - id: detect-secrets
         name: Detect Secrets
         entry: detect-secrets-hook --baseline .secrets.baseline
         language: system
         types: [python, yaml, shell, text]
+        stages: [commit]
