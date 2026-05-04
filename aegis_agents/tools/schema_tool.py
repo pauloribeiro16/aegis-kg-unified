@@ -26,8 +26,8 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
    - 10 nodes: D-01 through D-10
 
 5. SubDomain(subDomainId, name, description, soleAuthority, gapRisk)
-   - 38 nodes: D-01-1 through D-10-3
-   - Format: D-XX-Y (domain number - subdomain number)
+   - 38 nodes: D-01.1 through D-10.3
+   - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - soleAuthority: String — regulation ID with sole authority ('CRA','GDPR','NIS2','DORA','AIAct'), null if shared governance
    - gapRisk: String — 'HIGH', 'MEDIUM', or 'LOW'
 
@@ -52,7 +52,7 @@ Regulatory side:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)
+- (Domain)-[:CONTAINS]->(SubDomain)
 - (Clause)-[:MAPPED_TO]->(SubDomain)
 
 NIST CSF side:
@@ -64,7 +64,7 @@ NIST CSF side:
 
 ## IDENTITY CONVENTIONS
 
-- SubDomain: "D-01-1" (D-XX-Y format, dash separator)
+- SubDomain: "D-01.1" (D-XX.Y format, DOT separator)
 - Clause: "GDPR-C01", "CRA-C07", "NIS2-C16", "DORA-C09", "AIA-C01"
 - Regulation: "GDPR", "CRA", "NIS2", "DORA", "AIAct"
 - Article: "GDPR-Art32", "CRA-Art13", "DORA-Art15"
@@ -94,7 +94,7 @@ RETURN sd.name, count(c) AS gdprClauses, count(DISTINCT fc) AS nistControls
 ORDER BY gdprClauses DESC
 
 // Regulatory coverage by domain
-MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
 RETURN d.name AS domain, count(DISTINCT c) AS clauseCount
 ORDER BY clauseCount DESC
 """
@@ -149,7 +149,7 @@ REGULATORY SIDE:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)
+- (Domain)-[:CONTAINS]->(SubDomain)
 - (Clause)-[:MAPPED_TO]->(SubDomain)
 
 NIST CSF SIDE:
@@ -191,19 +191,19 @@ Nodes:
 - Article: links to clauses
 - Clause: 150 total with normativeIntensity (1=MAY, 2=SHOULD, 3=SHALL)
 - Domain: D-01 through D-10
-- SubDomain: D-01-1 through D-10-3 (38 total)
+- SubDomain: D-01.1 through D-10.3 (38 total)
 
 Relationships:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)
+- (Domain)-[:CONTAINS]->(SubDomain)
 - (Clause)-[:MAPPED_TO]->(SubDomain)
 """
     elif operation == "identities":
         return """IDENTITY CONVENTIONS:
 
-SubDomain: "D-01-1" (D-XX-Y format, dash separator)
+SubDomain: "D-01.1" (D-XX.Y format, DOT separator)
 Clause: "GDPR-C01", "CRA-C07", "NIS2-C16", "DORA-C09", "AIA-C01"
 Regulation: "GDPR", "CRA", "NIS2", "DORA", "AIAct"
 Article: "GDPR-Art32", "CRA-Art13", "DORA-Art15"

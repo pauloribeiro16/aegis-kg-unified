@@ -25,9 +25,9 @@ PROMPTS = {
 IMPORTANT RULES:
 1. Only output the Cypher query — no explanations, no markdown, no commentary.
 2. Use the schema provided. Node labels are: Regulation, Article, Clause, Domain, SubDomain, ComplementarityAnalysis, Framework, FrameworkCategory, FrameworkControl
-3. Relationship types: HAS_ARTICLE, HAS_CLAUSE, DEFINES, HAS_SUBDOMAIN, MAPPED_TO, OVERLAPS_WITH, HAS_CATEGORY, HAS_CONTROL, MAPS_TO_SUBDOMAIN, MAPS_TO_DOMAIN
+3. Relationship types: HAS_ARTICLE, HAS_CLAUSE, DEFINES, CONTAINS, MAPPED_TO, OVERLAPS_WITH, HAS_CATEGORY, HAS_CONTROL, MAPS_TO_SUBDOMAIN, MAPS_TO_DOMAIN
 4. Property names match exactly as defined in the schema.
-5. For the SubDomain ID format use 'D-01-1' (D-XX-Y with leading zeros dropped).
+5. For the SubDomain ID format use 'D-01.1' (DOT separator, D-XX.Y format).
 6. For clause IDs use format like 'GDPR-C01', 'CRA-C07', etc.
 7. For regulation IDs use 'GDPR', 'CRA', 'NIS2', 'DORA', 'AIAct'.
 8. If the question is ambiguous, pick the most logical interpretation.
@@ -44,7 +44,7 @@ MATCH (c:Clause) RETURN c.regulationId AS regulation, count(c) AS count ORDER BY
 MATCH (c:Clause {normativeIntensity: 3}) RETURN c.regulationId AS regulation, count(c) AS count ORDER BY count DESC
 
 // Average by group
-MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
 RETURN d.name AS domain, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
 
 // Collect related items into list (with limit)
