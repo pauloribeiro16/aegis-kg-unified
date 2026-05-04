@@ -1,4 +1,3 @@
-import os
 #!/usr/bin/env python3
 """
 AEGIS Phase 1 Knowledge Graph - REST API
@@ -169,7 +168,7 @@ def get_clause(clause_id):
     MATCH (c:Clause {clauseId: $clauseId})
     OPTIONAL MATCH (r:Regulation)-[:HAS_CLAUSE]->(c)
     OPTIONAL MATCH (a:Article)-[:DEFINES]->(c)
-    OPTIONAL MATCH (c)-[:COVERS_SUBDOMAIN]->(sd:SubDomain)
+    OPTIONAL MATCH (c)-[:MAPPED_TO]->(sd:SubDomain)
     OPTIONAL MATCH (d:Domain)-[:CONTAINS]->(sd)
     RETURN c.clauseId AS clauseId, c.number AS number, c.summary AS summary,
            c.description AS description, c.applicable AS applicable,
@@ -194,7 +193,7 @@ def gap_analysis():
     """Identify sub-domains with NO clause coverage"""
     cypher = """
     MATCH (sd:SubDomain)
-    WHERE NOT (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    WHERE NOT (sd)<-[:MAPPED_TO]-(:Clause)
     OPTIONAL MATCH (d:Domain)-[:CONTAINS]->(sd)
     RETURN sd.subDomainId AS subDomainId, sd.name AS name, 
            sd.description AS description, d.domainId AS domainId,
@@ -212,7 +211,7 @@ def coverage():
     reg_cypher = """
     MATCH (sd:SubDomain)
     WITH count(sd) AS totalSD
-    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:COVERS_SUBDOMAIN]->(sd:SubDomain)
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
     WITH totalSD, r.regulationId AS reg, r.name AS regName,
          count(DISTINCT sd) AS regCoverage
     RETURN reg, regName, regCoverage, totalSD,
@@ -223,10 +222,10 @@ def coverage():
     
     domain_cypher = """
     MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)
-    OPTIONAL MATCH (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    OPTIONAL MATCH (sd)<-[:MAPPED_TO]-(:Clause)
     WITH d.domainId AS domain, d.name AS domainName,
          count(sd) AS totalInDomain,
-         count(DISTINCT CASE WHEN (sd)<-[:COVERS_SUBDOMAIN]-(:Clause) THEN sd END) AS covered
+         count(DISTINCT CASE WHEN (sd)<-[:MAPPED_TO]-(:Clause) THEN sd END) AS covered
     RETURN domain, domainName, totalInDomain, covered,
            round(100.0 * covered / totalInDomain, 1) AS coveragePct
     ORDER BY domain
@@ -236,7 +235,7 @@ def coverage():
     summary_cypher = """
     MATCH (sd:SubDomain)
     WITH count(sd) AS total
-    OPTIONAL MATCH (sd:SubDomain)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    OPTIONAL MATCH (sd:SubDomain)<-[:MAPPED_TO]-(:Clause)
     WITH total, count(DISTINCT sd) AS covered
     RETURN total, covered, round(100.0 * covered / total, 1) AS overallPct
     """
@@ -253,7 +252,7 @@ def coverage():
 def applicability():
     """Show applicable regulations and clause counts"""
     cypher = """
-    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause {applicable: true})
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)
     WITH r.regulationId AS regId, r.name AS name, 
          count(c) AS applicableClauses, collect(c.clauseId) AS clauses
     RETURN regId, name, applicableClauses, clauses
@@ -309,12 +308,12 @@ def get_domains():
     """List all domains and their sub-domains"""
     cypher = """
     MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)
-    OPTIONAL MATCH (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    OPTIONAL MATCH (sd)<-[:MAPPED_TO]-(:Clause)
     RETURN d.domainId AS domainId, d.name AS domainName,
            d.description AS domainDescription,
            sd.subDomainId AS subDomainId, sd.name AS subDomainName,
            sd.description AS subDomainDescription,
-           CASE WHEN (sd)<-[:COVERS_SUBDOMAIN]-(:Clause) THEN true ELSE false END AS hasCoverage
+           CASE WHEN (sd)<-[:MAPPED_TO]-(:Clause) THEN true ELSE false END AS hasCoverage
     ORDER BY d.domainId, sd.subDomainId
     """
     results = exec_cypher(cypher)
