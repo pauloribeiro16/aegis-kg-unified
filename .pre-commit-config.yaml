@@ -13,4 +13,4 @@ repos:
         entry: detect-secrets-hook --baseline .secrets.baseline
         language: system
         types: [python, yaml, shell, text]
-        stages: [commit]
+        stages: [pre-commit]
