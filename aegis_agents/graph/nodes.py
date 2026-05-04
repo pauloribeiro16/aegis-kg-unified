@@ -9,6 +9,9 @@ from aegis_agents.graph.prompts import get_prompt
 from aegis_agents.graph.state import AgentState
 from aegis_agents.tools.schema_tool import SCHEMA_DESCRIPTION
 from aegis_agents.tracing import log_generation
+from aegis_agents.circuit_breaker import neo4j_cb, CircuitOpenError
+from aegis_agents.query_linter import validate_cypher
+from aegis_agents.fallback_queries import find_fallback
 
 
 def extract_cypher(raw_output: str) -> str | None:
@@ -46,7 +49,14 @@ def extract_cypher(raw_output: str) -> str | None:
 
 
 def exec_cypher(statement: str, params: dict = None) -> dict:
-    """Execute Cypher against Neo4j and return results."""
+    """Execute Cypher against Neo4j with circuit breaker and linter."""
+    is_valid, reason = validate_cypher(statement)
+    if not is_valid:
+        return {"error": f"Query rejected: {reason}", "data": [], "row_count": 0}
+
+    if neo4j_cb.is_open:
+        return {"error": "Circuit breaker OPEN — Neo4j unavailable", "data": [], "row_count": 0}
+
     import requests as req
     from aegis_agents.config import NEO4J_CONFIG
 
@@ -55,8 +65,9 @@ def exec_cypher(statement: str, params: dict = None) -> dict:
     payload = {"statements": [{"statement": statement, "parameters": params or {}}]}
 
     try:
-        resp = req.post(url, auth=auth, json=payload, timeout=60)
+        resp = req.post(url, auth=auth, json=payload, timeout=10)
         if resp.status_code != 200:
+            neo4j_cb._on_failure()
             return {"error": f"HTTP {resp.status_code}", "data": [], "row_count": 0}
         result = resp.json()
         if result.get("errors"):
@@ -67,8 +78,10 @@ def exec_cypher(statement: str, params: dict = None) -> dict:
                 cols = res.get("columns", [])
                 for row in res["data"]:
                     rows.append(dict(zip(cols, row["row"])))
+        neo4j_cb._on_success()
         return {"error": None, "data": rows, "row_count": len(rows)}
     except Exception as e:
+        neo4j_cb._on_failure()
         return {"error": str(e), "data": [], "row_count": 0}
 
 
@@ -82,11 +95,41 @@ def generate_and_execute(state: AgentState) -> AgentState:
     attempt = state.get("attempt", 1)
     previous_cypher = state.get("cypher")
     previous_error = None
+    fallback_used = False
 
     if state.get("steps"):
         last_step = state["steps"][-1]
         previous_error = last_step.get("error")
         previous_cypher = last_step.get("cypher")
+
+    if attempt >= state.get("max_attempts", 3):
+        fallback_cypher = find_fallback(question)
+        if fallback_cypher:
+            result = exec_cypher(fallback_cypher)
+            if result.get("row_count", 0) > 0:
+                step = {
+                    "attempt": attempt,
+                    "cypher": fallback_cypher,
+                    "error": None,
+                    "data": result.get("data", []),
+                    "row_count": result.get("row_count", 0),
+                    "latency_ms": 0,
+                    "fallback": True,
+                }
+                log_generation(
+                    name="fallback_query",
+                    input_data={"question": question, "fallback": True},
+                    output_data={"cypher": fallback_cypher, "row_count": result.get("row_count", 0)},
+                    model="fallback-template",
+                    latency_ms=0,
+                    metadata={"attempt": attempt, "task": "fallback"}
+                )
+                return {
+                    "steps": state.get("steps", []) + [step],
+                    "attempt": attempt + 1,
+                    "cypher": fallback_cypher,
+                    "fallback_used": True,
+                }
 
     if attempt == 1:
         prompt = get_prompt("cypher_generation", schema=SCHEMA_DESCRIPTION, question=question)

@@ -62,8 +62,73 @@ class AegisAgent:
 
         self.graph = build_agent_graph()
 
+    def _check_neo4j(self) -> bool:
+        """Check if Neo4j is reachable."""
+        try:
+            from aegis_agents.config import NEO4J_CONFIG
+            import requests as req
+            r = req.get(NEO4J_CONFIG["http_url"], auth=(NEO4J_CONFIG["user"], NEO4J_CONFIG["password"]), timeout=3)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    def _check_ollama(self) -> bool:
+        """Check if Ollama is reachable."""
+        try:
+            from aegis_agents.config import OLLAMA_CONFIG
+            import requests as req
+            r = req.get(f"{OLLAMA_CONFIG['base_url']}/api/tags", timeout=3)
+            return r.status_code == 200
+        except Exception:
+            return False
+
     def run(self, question: str) -> dict:
         """Run the agent with feedback loop."""
+        neo4j_ok = self._check_neo4j()
+        ollama_ok = self._check_ollama()
+
+        if not neo4j_ok and not ollama_ok:
+            return {
+                "answer": "Both Neo4j and Ollama are unavailable. Please check infrastructure (docker ps, curl localhost:7474, curl localhost:11434).",
+                "cypher": None,
+                "steps": [],
+                "success": False,
+                "attempt_count": 0,
+                "trace_id": None,
+                "degraded_mode": True,
+            }
+
+        if not ollama_ok:
+            from aegis_agents.fallback_queries import find_fallback
+            from aegis_agents.graph.nodes import exec_cypher
+            fallback_cypher = find_fallback(question)
+            if fallback_cypher:
+                result = exec_cypher(fallback_cypher)
+                if result.get("error") is None:
+                    data = result.get("data", [])
+                    answer = "\n".join(
+                        [", ".join(f"{k}={v}" for k, v in row.items() if v is not None) for row in data[:20]]
+                    )
+                    return {
+                        "answer": f"[Fallback mode — Ollama unavailable]\n{answer}",
+                        "cypher": fallback_cypher,
+                        "steps": [{"attempt": 1, "cypher": fallback_cypher, "error": None, "data": data, "row_count": len(data), "fallback": True}],
+                        "success": True,
+                        "attempt_count": 1,
+                        "trace_id": None,
+                        "fallback_used": True,
+                        "degraded_mode": True,
+                    }
+            return {
+                "answer": "Ollama is unavailable and no fallback query matches this question. Please start Ollama.",
+                "cypher": None,
+                "steps": [],
+                "success": False,
+                "attempt_count": 0,
+                "trace_id": None,
+                "degraded_mode": True,
+            }
+
         initial_state: AgentState = {
             "messages": [],
             "question": question,
