@@ -187,8 +187,8 @@ def _extract_scores_and_reasoning(parsed: dict, dimensions: list[str]) -> tuple[
     return scores, reasoning, avg_scores
 
 
-def _clamp_score(val, default: int = 3) -> int:
-    """Clamp score to 1-5 range."""
+def _clamp_score(val, default: int = 0) -> int:
+    """Clamp score to 1-5 range. Default 0 indicates failure."""
     try:
         v = int(val)
         return max(1, min(5, v))
@@ -197,11 +197,11 @@ def _clamp_score(val, default: int = 3) -> int:
 
 
 def _default_scores(dimensions: list[str]) -> dict:
-    """Return default scores structure."""
+    """Return default scores structure — 0 indicates failure."""
     scores = {}
     for dim in dimensions:
-        scores[f"{dim}_query"] = 3
-        scores[f"{dim}_answer"] = 3
+        scores[f"{dim}_query"] = 0
+        scores[f"{dim}_answer"] = 0
     return scores
 
 
