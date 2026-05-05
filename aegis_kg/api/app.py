@@ -306,6 +306,24 @@ def heatmap():
         "description": "38 SubDomains × 5 Regulations matrix. Each cell shows clauseCount, totalNI, and avgNI."
     })
 
+@app.route('/api/hotspots', methods=['GET'])
+def get_hotspots():
+    """SubDomains covered by 3+ regulations — regulatory hotspots (Batch 12)"""
+    cypher = """
+    MATCH (sd:SubDomain)
+    WHERE sd.hotspotScore >= 3
+    OPTIONAL MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd)
+    RETURN sd.subDomainId AS subDomainId, sd.name AS name,
+           sd.hotspotScore AS hotspotScore, sd.hotspotTier AS hotspotTier,
+           sd.regulationCount AS regulationCount, sd.coveringRegulations AS coveringRegulations,
+           d.domainId AS domainId, d.name AS domainName
+    ORDER BY sd.hotspotScore DESC, sd.subDomainId
+    """
+    results = exec_cypher(cypher)
+    if isinstance(results, dict) and 'error' in results:
+        return jsonify(results), 500
+    return jsonify(format_results(results))
+
 @app.route('/api/applicability', methods=['GET'])
 def applicability():
     """Show applicable regulations and clause counts"""
@@ -376,6 +394,8 @@ def get_domains():
            sd.avgNormativeIntensity AS avgNI,
            sd.weightedDensity AS weightedDensity,
            sd.coveringRegulations AS coveringRegulations,
+           sd.hotspotScore AS hotspotScore,
+           sd.hotspotTier AS hotspotTier,
            CASE WHEN sd.clauseCount > 0 THEN true ELSE false END AS hasCoverage
     ORDER BY domainId, subDomainId
     """
@@ -403,7 +423,9 @@ def get_domains():
             "densityScore": row.get('densityScore') or 0.0,
             "avgNormativeIntensity": row.get('avgNI') or 0.0,
             "weightedDensity": row.get('weightedDensity') or 0.0,
-            "coveringRegulations": row.get('coveringRegulations') or []
+            "coveringRegulations": row.get('coveringRegulations') or [],
+            "hotspotScore": row.get('hotspotScore') or 0,
+            "hotspotTier": row.get('hotspotTier') or 'LOW'
         })
 
     return jsonify(list(domains.values()))

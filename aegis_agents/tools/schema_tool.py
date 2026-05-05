@@ -140,6 +140,14 @@ MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
 WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
 RETURN sdId, sdName, regs, totalClauses
 ORDER BY totalClauses DESC
+
+// Multi-Regulation Hotspots (Batch 12)
+MATCH (sd:SubDomain) WHERE sd.hotspotTier IN ['CRITICAL', 'HIGH', 'MODERATE']
+RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
+ORDER BY sd.hotspotScore DESC
+
+// Subdomains by hotspot tier
+MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier
 """
 
 

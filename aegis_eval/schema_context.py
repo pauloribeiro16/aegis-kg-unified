@@ -245,6 +245,17 @@ MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
 WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
 RETURN sdId, sdName, regs, totalClauses ORDER BY totalClauses DESC
 
+### HOTSPOT PATTERNS (Batch 12)
+MATCH (sd:SubDomain) WHERE sd.hotspotScore >= 3
+RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
+ORDER BY sd.hotspotScore DESC
+
+MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier
+
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+RETURN d.name AS domain, sd.hotspotTier AS tier, count(sd) AS count
+ORDER BY domain, tier
+
 """
 
 EXAMPLES = [

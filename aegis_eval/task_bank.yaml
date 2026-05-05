@@ -740,3 +740,59 @@ tasks:
     - regulation
     - clauseCount
     - totalNI
+- id: hotspots_list
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are regulatory hotspots (covered by 3 or more regulations)?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.hotspotScore >= 3 RETURN sd.subDomainId, sd.name,
+    sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
+    ORDER BY sd.hotspotScore DESC, sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.hotspotScore
+    - sd.hotspotTier
+    - sd.regulationCount
+    - sd.coveringRegulations
+- id: hotspot_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each hotspot tier?
+  expected_cypher: 'MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier'
+  expected_result:
+    row_count: null
+    columns:
+    - tier
+    - count
+- id: hotspots_by_domain
+  category: coverage
+  difficulty: medium
+  question: Which security domain has the most hotspot subdomains?
+  expected_cypher: 'MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+    WHERE sd.hotspotScore >= 3
+    RETURN d.domainId AS domainId, d.name AS domainName,
+    count(sd) AS hotspotCount, collect(sd.hotspotTier) AS tiers
+    ORDER BY hotspotCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - domainId
+    - domainName
+    - hotspotCount
+    - tiers
+- id: critical_hotspots_detail
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are CRITICAL hotspots and what regulations cover them?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.hotspotTier = ''CRITICAL''
+    RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.coveringRegulations
+    ORDER BY sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.hotspotScore
+    - sd.coveringRegulations
