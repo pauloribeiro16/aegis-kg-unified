@@ -40,13 +40,24 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 4. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, soleAuthority, gapRisk)
+5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
-   - KNOWN ISSUE: keywords and examples are empty on all nodes
+   - BATCH 9 properties (computed from graph):
+     - clauseCount: integer — count of clauses mapped via MAPPED_TO
+     - regulationCount: integer — count of distinct regulations covering this subdomain
+     - densityScore: float — clauseCount / 5.0 (normalized by max 5 regulations)
+     - avgNormativeIntensity: float — average NI of covering clauses (range 0-3.0)
+     - weightedDensity: float — sum(NI) / 15.0 (NI-weighted, max 1.0)
+     - coveringRegulations: list[string] — regulation IDs covering this subdomain
 
-6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification)
-   - 6 nodes with real Jaccard indices (NIS2-DORA=0.857, CRA-DORA=0.562, etc.)
+6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+   - 10 nodes: all regulation pairs (5 choose 2)
+   - BATCH 9: dynamic Jaccard computed from actual graph data
+     - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
+     - dynamicSharedSubDomainCount: integer — actual shared SubDomain count
+     - jaccardSource: 'DYNAMIC' — indicates computed from graph
+   - jaccardIndex: original static value (kept for reference)
 
 7. StrategicTension(tensionId, description, severity)
    - 4 nodes with real regulatory conflicts (GDPR vs CRA, GDPR vs NIS2, DPIA vs AI Act, NIS2 vs DORA alignment)
@@ -76,7 +87,7 @@ Regulatory side:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:CONTAINS]->(SubDomain)          [NOT HAS_SUBDOMAIN]
+- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)        [NOT CONTAINS]
 - (Clause)-[:MAPPED_TO]->(SubDomain)          [NOT COVERS_SUBDOMAIN]
 - (Regulation)-[:HAS_TENSION_WITH]->(Regulation)
 - (StrategicTension)-[:AFFECTS_SUBDOMAIN]->(SubDomain)
@@ -193,7 +204,7 @@ MATCH (fc:FrameworkControl {categoryId: 'PR.DS'}) RETURN fc.controlId, fc.title 
 MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain {subDomainId: 'D-01.1'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
 
 ### NIST controls covering each AEGIS domain
-MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
 
 ### Subdomains covered by NIST controls (with regulatory comparison)
 MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN sd.name AS subdomain, count(DISTINCT c) AS clauseCount, count(DISTINCT fc) AS nistCount ORDER BY clauseCount DESC
@@ -201,8 +212,18 @@ MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:Framewor
 ### Subdomains with NIST but no regulatory coverage
 MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd)) RETURN sd.subDomainId, sd.name ORDER BY sd.subDomainId
 
-### Regulation coverage across domains (CONTAINS not HAS_SUBDOMAIN)
-MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:CONTAINS]-(d:Domain) RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount ORDER BY domain, clauseCount DESC
+### Regulation coverage across domains
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain) RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount ORDER BY domain, clauseCount DESC
+
+### SUBDOMAIN DENSITY PATTERNS (Batch 9)
+MATCH (sd:SubDomain) WHERE sd.clauseCount > 0 RETURN sd.subDomainId, sd.name, sd.clauseCount, sd.densityScore ORDER BY sd.densityScore DESC LIMIT 10
+
+MATCH (sd:SubDomain) WHERE sd.regulationCount >= 4 RETURN sd.subDomainId, sd.name, sd.regulationCount, sd.coveringRegulations ORDER BY sd.regulationCount DESC
+
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId, d.name, count(sd) AS totalSubdomains, avg(sd.densityScore) AS avgDensity ORDER BY avgDensity DESC
+
+### DYNAMIC JACCARD (Batch 9)
+MATCH (ca:ComplementarityAnalysis) WHERE ca.jaccardSource = 'DYNAMIC' RETURN ca.regulation1Id, ca.regulation2Id, ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount AS shared ORDER BY jaccardIndex DESC
 
 """
 
@@ -225,7 +246,7 @@ EXAMPLES = [
     },
     {
         "question": "How many NIST controls map to each AEGIS domain?",
-        "cypher": "MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistControlCount ORDER BY nistControlCount DESC"
+        "cypher": "MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistControlCount ORDER BY nistControlCount DESC"
     },
     {
         "question": "What are the strategic tensions between GDPR and CRA?",

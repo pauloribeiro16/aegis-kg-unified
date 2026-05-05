@@ -528,3 +528,97 @@ tasks:
     columns:
     - fc.controlId
     - fc.description
+- id: subdomain_density_ranking
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have the highest clause density?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.clauseCount > 0 RETURN sd.subDomainId,
+    sd.name, sd.clauseCount, sd.densityScore ORDER BY sd.densityScore DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.clauseCount
+    - sd.densityScore
+- id: multi_regulation_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are covered by 4 or more regulations?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.regulationCount >= 4 RETURN sd.subDomainId,
+    sd.name, sd.regulationCount, sd.coveringRegulations ORDER BY sd.regulationCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.regulationCount
+    - sd.coveringRegulations
+- id: regulation_density_comparison
+  category: coverage
+  difficulty: hard
+  question: What is the average subdomain density for each regulation?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, count(DISTINCT sd) AS coveredSubdomains,
+    avg(sd.densityScore) AS avgDensity ORDER BY avgDensity DESC'
+  expected_result:
+    row_count: 5
+    columns:
+    - regulation
+    - coveredSubdomains
+    - avgDensity
+- id: dynamic_jaccard_nis2_dora
+  category: complementarity
+  difficulty: hard
+  question: What is the dynamically computed Jaccard index between NIS2 and DORA?
+  expected_cypher: 'MATCH (ca:ComplementarityAnalysis) WHERE (ca.regulation1Id = ''NIS2''
+    AND ca.regulation2Id = ''DORA'') OR (ca.regulation1Id = ''DORA'' AND ca.regulation2Id
+    = ''NIS2'') RETURN ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount
+    AS sharedSubDomains, ca.jaccardSource AS source'
+  expected_result:
+    row_count: 1
+    columns:
+    - jaccardIndex
+    - sharedSubDomains
+    - source
+- id: normative_intensity_density
+  category: coverage
+  difficulty: hard
+  question: Which subdomains have the highest average normative intensity?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.avgNormativeIntensity > 0 RETURN sd.subDomainId,
+    sd.name, sd.avgNormativeIntensity, sd.clauseCount ORDER BY sd.avgNormativeIntensity DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.avgNormativeIntensity
+    - sd.clauseCount
+- id: sparse_coverage_subdomains
+  category: gap_analysis
+  difficulty: medium
+  question: Which subdomains have only one covering regulation?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.regulationCount = 1 RETURN sd.subDomainId,
+    sd.name, sd.coveringRegulations, sd.gapRisk ORDER BY sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.coveringRegulations
+    - sd.gapRisk
+- id: density_by_domain
+  category: coverage
+  difficulty: hard
+  question: What is the average subdomain density per security domain?
+  expected_cypher: 'MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId,
+    d.name, count(sd) AS totalSubdomains, avg(sd.densityScore) AS avgDensity, sum(CASE
+    WHEN sd.clauseCount > 0 THEN 1 ELSE 0 END) AS coveredSubdomains ORDER BY avgDensity DESC'
+  expected_result:
+    row_count: 10
+    columns:
+    - domainId
+    - name
+    - totalSubdomains
+    - avgDensity
+    - coveredSubdomains
