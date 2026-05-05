@@ -844,3 +844,42 @@ tasks:
     - conflictType
     - description
     - severity
+- id: conflict_severity_ranking
+  category: coverage
+  difficulty: medium
+  question: Which regulation pairs have the highest conflict severity score?
+  expected_cypher: 'MATCH (ca:ComplementarityAnalysis)
+    WHERE ca.conflictSeverityScore IS NOT NULL
+    RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
+    ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
+    ORDER BY severityScore DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - reg1
+    - reg2
+    - severityScore
+    - components
+- id: top_conflict_pairs
+  category: coverage
+  difficulty: easy
+  question: What is the severity score between GDPR and DORA?
+  expected_cypher: "MATCH (ca:ComplementarityAnalysis) WHERE ca.regulation1Id IN ['GDPR','DORA'] AND ca.regulation2Id IN ['GDPR','DORA'] RETURN ca.analysisId, ca.regulation1Id, ca.regulation2Id, ca.conflictSeverityScore AS score ORDER BY score DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - regulation1Id
+    - regulation2Id
+    - score
+- id: severity_by_jaccard
+  category: coverage
+  difficulty: medium
+  question: What is the severity score for the NIS2-DORA pair?
+  expected_cypher: "MATCH (ca:ComplementarityAnalysis) WHERE ca.analysisId = 'NIS2-DORA-001' RETURN ca.analysisId, ca.conflictSeverityScore AS score ORDER BY score DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - score

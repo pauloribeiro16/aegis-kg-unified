@@ -159,6 +159,13 @@ MATCH (st:StrategicTension)-[:AFFECTS_SUBDOMAIN]->(sd:SubDomain)
 RETURN st.tensionId AS tensionId, st.conflictType AS conflictType, st.severity AS severity,
        sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.description AS description
 ORDER BY sd.subDomainId
+
+// Conflict Severity (Batch 14)
+MATCH (ca:ComplementarityAnalysis)
+WHERE ca.conflictSeverityScore IS NOT NULL
+RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
+       ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
+ORDER BY severityScore DESC
 """
 
 
