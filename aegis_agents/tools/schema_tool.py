@@ -33,6 +33,12 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
    - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
    - Relationship: (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
 
+ 2b. RegulatoryAuthority(authorityId, authorityName, authorityType, soleAuthorityCount, totalEffectiveCoverage, avgObligationUrgency, avgContinuousRatio, authorityInfluenceScore, primaryRegulationId)
+   - 5 nodes: ENISA, DPAs, NCAs_ENISA, EU_AI_OFFICE, ESAs
+   - authorityType: EU_AGENCY | NATIONAL_DPA | NATIONAL_COORDINATION | EU_OFFICE | ESA_BODY
+   - authorityInfluenceScore: composite = soleAuthorityCount*5 + totalEC*0.3 + avgUrgency*count*2 + totalHotspotScore*1
+   - Relationship: (SubDomain)-[:UNDER_REGULATORY_AUTHORITY]->(RegulatoryAuthority)
+
  3. Article(articleId, number, title, chapter, summary, obligationType)
    - 47 nodes total
 
@@ -43,7 +49,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
  5. Domain(domainId, name, description)
    - 10 nodes: D-01 through D-10
 
- 6. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
+ 6. SubDomain(subDomainId, name, description, soleAuthority, authorityId, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -68,6 +74,8 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - dominantObligationType: most frequent obligation type of clauses mapped to this SubDomain
      - continuousObligationRatio: CONTINUOUS clauses / total mapped clauses
      - obligationUrgencyIndex: float [0..1] — same formula as Regulation.urgencyIndex applied to SubDomain clauses
+   - BATCH 18 properties (authority concentration):
+     - authorityId: string — ID of the sole regulatory authority for this SubDomain (e.g., 'ENISA', 'DPAs')
 
 7. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
@@ -247,6 +255,17 @@ ORDER BY sd.obligationUrgencyIndex DESC
 MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS'
 RETURN sd.subDomainId, sd.name, sd.obligationUrgencyIndex, sd.continuousObligationRatio
 ORDER BY sd.continuousObligationRatio DESC
+
+// Authority Concentration (Batch 18)
+MATCH (auth:RegulatoryAuthority)
+RETURN auth.authorityId, auth.authorityName, auth.authorityType,
+       auth.soleAuthorityCount, auth.authorityInfluenceScore
+ORDER BY auth.authorityInfluenceScore DESC
+
+MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain)
+WHERE auth.authorityId = 'ENISA'
+RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.obligationUrgencyIndex
+ORDER BY sd.effectiveCoverage DESC
 """
 
 

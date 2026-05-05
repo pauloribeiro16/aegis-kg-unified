@@ -40,23 +40,29 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - continuousObligationRatio: CONTINUOUS clauses / total clauses
      - urgencyIndex: float [0..1] — weighted composite: (continuous*1.0 + triggered*0.7 + periodic*0.5 + oneTime*0.3) / total
 
-2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
+ 2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
    - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
    - Relationship: (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
 
-3. Article(articleId, number, title)
+ 3. RegulatoryAuthority(authorityId, authorityName, authorityType, soleAuthorityCount, totalEffectiveCoverage, avgObligationUrgency, avgContinuousRatio, authorityInfluenceScore, primaryRegulationId)
+   - 5 nodes: ENISA, DPAs, NCAs_ENISA, EU_AI_OFFICE, ESAs
+   - authorityType: EU_AGENCY | NATIONAL_DPA | NATIONAL_COORDINATION | EU_OFFICE | ESA_BODY
+   - authorityInfluenceScore: composite = soleAuthorityCount*5 + totalEC*0.3 + avgUrgency*count*2 + totalHotspotScore*1
+   - Relationship: (SubDomain)-[:UNDER_REGULATORY_AUTHORITY]->(RegulatoryAuthority)
+
+ 4. Article(articleId, number, title)
    - 47 nodes total
    - KNOWN ISSUE: regulationId is NULL on all articles; chapter, section, obligationType are empty
 
-4. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
+ 5. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
    - 150 nodes total
    - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
    - KNOWN ISSUE: applicable is NULL on all clauses; sourceReference and crossReferences are empty
 
-5. Domain(domainId, name)
+ 6. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-6. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
+ 7. SubDomain(subDomainId, name, soleAuthority, authorityId, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -81,8 +87,10 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - dominantObligationType: most frequent obligation type of clauses mapped to this SubDomain
      - continuousObligationRatio: CONTINUOUS clauses / total mapped clauses
      - obligationUrgencyIndex: float [0..1] — same formula as Regulation.urgencyIndex applied to SubDomain clauses
+   - BATCH 18 properties (authority concentration):
+     - authorityId: string — ID of the sole regulatory authority (e.g., 'ENISA', 'DPAs', 'EU_AI_OFFICE')
 
-7. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+ 8. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
    - BATCH 9: dynamic Jaccard computed from actual graph data
      - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
@@ -90,10 +98,10 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - jaccardSource: 'DYNAMIC' — indicates computed from graph
    - jaccardIndex: original static value (kept for reference)
 
-8. StrategicTension(tensionId, description, severity)
+ 9. StrategicTension(tensionId, description, severity)
    - 4 nodes with real regulatory conflicts (GDPR vs CRA, GDPR vs NIS2, DPIA vs AI Act, NIS2 vs DORA alignment)
 
-9. ApplicabilityCondition(conditionId, description)
+10. ApplicabilityCondition(conditionId, description)
    - 12 nodes with per-regulation applicability rules
    - KNOWN ISSUE: conditionType is NULL
 
@@ -126,6 +134,7 @@ Regulatory side:
 - (StrategicTension)-[:INVOLVES_CLAUSE]->(Clause)
 - (Regulation)-[:HAS_APPLICABILITY]->(ApplicabilityCondition)
 - (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
+- (SubDomain)-[:UNDER_REGULATORY_AUTHORITY]->(RegulatoryAuthority)
 - (SubDomain)-[:HAS_METRICS]->(SubDomainMetrics)
 
 NIST CSF side:
@@ -350,6 +359,22 @@ ORDER BY sd.obligationUrgencyIndex DESC
 MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS'
 RETURN sd.subDomainId, sd.name, sd.obligationUrgencyIndex, sd.continuousObligationRatio
 ORDER BY sd.continuousObligationRatio DESC
+
+### AUTHORITY CONCENTRATION PATTERNS (Batch 18)
+MATCH (auth:RegulatoryAuthority)
+RETURN auth.authorityId, auth.authorityName, auth.authorityType,
+       auth.soleAuthorityCount, auth.authorityInfluenceScore
+ORDER BY auth.authorityInfluenceScore DESC
+
+MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain)
+RETURN auth.authorityId, auth.authorityName, count(sd) AS subdomainCount,
+       auth.authorityInfluenceScore
+ORDER BY auth.authorityInfluenceScore DESC
+
+MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain)
+WHERE auth.authorityId = 'ENISA'
+RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.obligationUrgencyIndex
+ORDER BY sd.effectiveCoverage DESC
 
 """
 

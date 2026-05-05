@@ -994,3 +994,38 @@ tasks:
     - name
     - continuousObligationRatio
     - obligationUrgencyIndex
+- id: authority_influence_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulatory authority has the highest influence score based on sole-authority SubDomains?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority) RETURN auth.authorityId, auth.authorityName, auth.authorityType, auth.soleAuthorityCount, auth.authorityInfluenceScore ORDER BY auth.authorityInfluenceScore DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - authorityId
+    - authorityName
+    - authorityType
+    - soleAuthorityCount
+    - authorityInfluenceScore
+- id: enisa_subdomains
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are under ENISA regulatory authority?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain) WHERE auth.authorityId = 'ENISA' RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.obligationUrgencyIndex ORDER BY sd.effectiveCoverage DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - effectiveCoverage
+    - obligationUrgencyIndex
+- id: authority_subdomain_count
+  category: coverage
+  difficulty: easy
+  question: How many sole-authority subdomains does each regulatory authority oversee?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain) RETURN auth.authorityId, count(sd) AS subdomainCount ORDER BY subdomainCount DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - authorityId
+    - subdomainCount
