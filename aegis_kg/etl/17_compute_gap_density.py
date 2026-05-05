@@ -1,5 +1,5 @@
 """
-Batch 15 — Gap Density ETL
+Gap Density ETL
 Computes per-SubDomain gap density metrics based on clause distribution
 across the 5 regulations (GDPR, CRA, NIS2, DORA, AI Act).
 
@@ -96,7 +96,7 @@ def main():
     for u in updates:
         tier_dist[u["gapDensityTier"]] += 1
 
-    print(f"[Batch 15] Gap Density computed for {len(updates)} SubDomains")
+    print(f"[Gap Density] Gap Density computed for {len(updates)} SubDomains")
     print(f"  DENSE: {tier_dist['DENSE']}, MODERATE: {tier_dist['MODERATE']}, SPARSE: {tier_dist['SPARSE']}")
     print(f"  Top DENSE: ", end="")
     dense = [u for u in updates if u["gapDensityTier"] == "DENSE"]

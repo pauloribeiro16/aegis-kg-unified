@@ -27,15 +27,13 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 1. Regulation(regulationId, label, description, euReference, clauseCount, applicabilityConditionCount, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement, obligationProfile, dominantObligationType, continuousObligationRatio, urgencyIndex)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
    - KNOWN ISSUE: name, fullName, lastAmended, notificationTimelines are NULL (effectiveDate IS populated)
-   - BATCH 16 properties (temporal applicability):
-     - complianceDeadline: date — deadline for organizations to comply
+   - Temporal applicability:     - complianceDeadline: date — deadline for organizations to comply
      - enforcementDate: date — date penalties/sanctions begin
      - applicationDate: date — date the regulation starts applying to organizations
      - urgencyTier: string — 'PAST_DUE', 'CRITICAL' (<=90 days), 'URGENT' (<=365 days), 'ON_TRACK' (>365 days)
      - daysToCompliance: integer — days until compliance deadline (negative = past due)
      - daysToEnforcement: integer — days until enforcement date (negative = enforcement active)
-   - BATCH 17 properties (obligation type analysis):
-     - obligationProfile: JSON string — e.g. '{"CONTINUOUS":18,"ONE_TIME":1,"PERIODIC":6,"TRIGGERED":4}'
+   - Obligation type analysis:     - obligationProfile: JSON string — e.g. '{"CONTINUOUS":18,"ONE_TIME":1,"PERIODIC":6,"TRIGGERED":4}'
      - dominantObligationType: most frequent obligation type
      - continuousObligationRatio: CONTINUOUS clauses / total clauses
      - urgencyIndex: float [0..1] — weighted composite: (continuous*1.0 + triggered*0.7 + periodic*0.5 + oneTime*0.3) / total
@@ -65,38 +63,36 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
  7. SubDomain(subDomainId, name, soleAuthority, authorityId, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
-   - BATCH 9 properties (computed from graph):
-     - clauseCount: integer — count of clauses mapped via MAPPED_TO
+   - Computed from graph:     - clauseCount: integer — count of clauses mapped via MAPPED_TO
      - regulationCount: integer — count of distinct regulations covering this subdomain
      - densityScore: float — clauseCount / 5.0 (normalized by max 5 regulations)
      - avgNormativeIntensity: float — average NI of covering clauses (range 0-3.0)
      - weightedDensity: float — sum(NI) / 15.0 (NI-weighted, max 1.0)
      - coveringRegulations: list[string] — regulation IDs covering this subdomain
-   - BATCH 10 properties (NI-weighted):
+   - NI-weighted coverage:
      - effectiveCoverage: float — sum of NI values of all clauses mapped to this SubDomain (higher = stronger regulatory pressure)
      - effectiveCoverageTier: string — 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0)
-   - BATCH 12 properties (multi-regulation hotspots):
+   - Multi-regulation hotspots:
      - hotspotScore: integer — number of regulations covering this SubDomain (same as regulationCount)
      - hotspotTier: string — 'CRITICAL' (>=5 regs), 'HIGH' (>=4), 'MODERATE' (>=3), 'LOW' (<3)
-   - BATCH 15 properties (gap density):
+   - Gap density:
      - gapDensityScore: float [0..1] — balance of clause distribution across regulations (1=perfectly balanced, 0=highly unbalanced); based on coefficient of variation
      - gapDensityTier: string — 'DENSE' (>=0.5), 'MODERATE' (>=0.2), 'SPARSE' (<0.2)
      - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
      - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
-   - BATCH 17 properties (obligation type analysis):
+   - Obligation type analysis:
      - dominantObligationType: most frequent obligation type of clauses mapped to this SubDomain
      - continuousObligationRatio: CONTINUOUS clauses / total mapped clauses
      - obligationUrgencyIndex: float [0..1] — same formula as Regulation.urgencyIndex applied to SubDomain clauses
-   - BATCH 18 properties (authority concentration):
+   - Authority concentration:
      - authorityId: string — ID of the sole regulatory authority (e.g., 'ENISA', 'DPAs', 'EU_AI_OFFICE')
 
  8. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
-   - BATCH 9: dynamic Jaccard computed from actual graph data
      - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
      - dynamicSharedSubDomainCount: integer — actual shared SubDomain count
      - jaccardSource: 'DYNAMIC' — indicates computed from graph
-   - jaccardIndex: original static value (kept for reference)
+     - jaccardIndex: original static value (kept for reference)
 
  9. StrategicTension(tensionId, description, severity)
    - 4 nodes with real regulatory conflicts (GDPR vs CRA, GDPR vs NIS2, DPIA vs AI Act, NIS2 vs DORA alignment)
@@ -256,24 +252,24 @@ MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain) WHERE NOT EXIST
 ### Regulation coverage across domains
 MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain) RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount ORDER BY domain, clauseCount DESC
 
-### SUBDOMAIN DENSITY PATTERNS (Batch 9)
+### SUBDOMAIN DENSITY PATTERNS
 MATCH (sd:SubDomain) WHERE sd.clauseCount > 0 RETURN sd.subDomainId, sd.name, sd.clauseCount, sd.densityScore ORDER BY sd.densityScore DESC LIMIT 10
 
 MATCH (sd:SubDomain) WHERE sd.regulationCount >= 4 RETURN sd.subDomainId, sd.name, sd.regulationCount, sd.coveringRegulations ORDER BY sd.regulationCount DESC
 
 MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId, d.name, count(sd) AS totalSubdomains, avg(sd.densityScore) AS avgDensity ORDER BY avgDensity DESC
 
-### DYNAMIC JACCARD (Batch 9)
+### DYNAMIC JACCARD
 MATCH (ca:ComplementarityAnalysis) WHERE ca.jaccardSource = 'DYNAMIC' RETURN ca.regulation1Id, ca.regulation2Id, ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount AS shared ORDER BY jaccardIndex DESC
 
-### NI-WEIGHTED COVERAGE PATTERNS (Batch 10)
+### NI-WEIGHTED COVERAGE PATTERNS
 MATCH (sd:SubDomain) WHERE sd.effectiveCoverageTier = 'HIGH' RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier ORDER BY sd.effectiveCoverage DESC LIMIT 10
 
 MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10.0 RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount ORDER BY sd.effectiveCoverage DESC
 
 MATCH (r:Regulation) WHERE r.effectiveCoverageTier IS NOT NULL RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC
 
-### HEATMAP PATTERNS (Batch 11)
+### HEATMAP PATTERNS
 MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
 RETURN sd.subDomainId, sd.name AS subdomain, r.regulationId AS regulation,
        count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
@@ -283,7 +279,7 @@ MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
 WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
 RETURN sdId, sdName, regs, totalClauses ORDER BY totalClauses DESC
 
-### HOTSPOT PATTERNS (Batch 12)
+### HOTSPOT PATTERNS
 MATCH (sd:SubDomain) WHERE sd.hotspotScore >= 3
 RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
 ORDER BY sd.hotspotScore DESC
@@ -294,7 +290,7 @@ MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
 RETURN d.name AS domain, sd.hotspotTier AS tier, count(sd) AS count
 ORDER BY domain, tier
 
-### STRATEGIC TENSION PATTERNS (Batch 13)
+### STRATEGIC TENSION PATTERNS
 MATCH (st:StrategicTension)-[:INVOLVES_REGULATION]->(r:Regulation)
 WITH st, collect(r.regulationId) AS regs, st.conflictType AS conflictType, st.severity AS severity
 RETURN st.tensionId AS tensionId, regs, conflictType, severity, st.description AS description
@@ -305,14 +301,14 @@ RETURN st.tensionId AS tensionId, st.conflictType AS conflictType, st.severity A
        sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.description AS description
 ORDER BY sd.subDomainId
 
-### CONFLICT SEVERITY PATTERNS (Batch 14)
+### CONFLICT SEVERITY PATTERNS
 MATCH (ca:ComplementarityAnalysis)
 WHERE ca.conflictSeverityScore IS NOT NULL
 RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
        ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
 ORDER BY severityScore DESC
 
-### GAP DENSITY PATTERNS (Batch 15)
+### GAP DENSITY PATTERNS
 MATCH (sd:SubDomain)
 WHERE sd.gapDensityScore IS NOT NULL
 RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.gapDensityTier,
@@ -329,7 +325,7 @@ MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE'
 RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations
 ORDER BY sd.gapDensityScore ASC, sd.regulationCount DESC
 
-### TEMPORAL APPLICABILITY PATTERNS (Batch 16)
+### TEMPORAL APPLICABILITY PATTERNS
 MATCH (r:Regulation)
 RETURN r.regulationId, r.name, r.effectiveDate, r.applicationDate,
        r.complianceDeadline, r.enforcementDate, r.urgencyTier,
@@ -345,7 +341,7 @@ WHERE r.regulationId = 'AIAct'
 RETURN t.eventType, t.eventDate, t.description
 ORDER BY t.eventDate
 
-### OBLIGATION TYPE PATTERNS (Batch 17)
+### OBLIGATION TYPE PATTERNS
 MATCH (r:Regulation)
 RETURN r.regulationId, r.name, r.obligationProfile, r.dominantObligationType,
        r.continuousObligationRatio, r.urgencyIndex
@@ -360,7 +356,7 @@ MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS'
 RETURN sd.subDomainId, sd.name, sd.obligationUrgencyIndex, sd.continuousObligationRatio
 ORDER BY sd.continuousObligationRatio DESC
 
-### AUTHORITY CONCENTRATION PATTERNS (Batch 18)
+### AUTHORITY CONCENTRATION PATTERNS
 MATCH (auth:RegulatoryAuthority)
 RETURN auth.authorityId, auth.authorityName, auth.authorityType,
        auth.soleAuthorityCount, auth.authorityInfluenceScore

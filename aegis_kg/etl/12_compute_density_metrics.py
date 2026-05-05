@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batch 9 ETL: Compute SubDomain density metrics and dynamic Jaccard.
+Compute SubDomain density metrics and dynamic Jaccard.
 
 Computes for each SubDomain:
   - clauseCount: count of clauses mapped to this SubDomain
@@ -38,7 +38,7 @@ def get_driver():
 
 def compute_subdomain_metrics(driver):
     """Compute and set density metrics on all SubDomain nodes."""
-    print("[BATCH 9] Computing SubDomain density metrics...")
+    print("[Density Metrics] Computing SubDomain density metrics...")
 
     query = """
     MATCH (sd:SubDomain)
@@ -73,7 +73,7 @@ def compute_subdomain_metrics(driver):
         result = s.run(query)
         rows = [dict(r) for r in result]
 
-    print(f"[BATCH 9] Updated {len(rows)} SubDomain nodes.")
+    print(f"[Density Metrics] Updated {len(rows)} SubDomain nodes.")
     for r in rows:
         print(f"  {r['id']}: clauses={r['clauseCount']}, regs={r['regulationCount']}, "
               f"density={r['densityScore']}, avgNI={r['avgNI']}, "
@@ -84,7 +84,7 @@ def compute_subdomain_metrics(driver):
 
 def compute_dynamic_jaccard(driver):
     """Recompute Jaccard from actual graph data for all regulation pairs."""
-    print("\n[BATCH 9] Computing dynamic Jaccard indices...")
+    print("\n[Density Metrics] Computing dynamic Jaccard indices...")
 
     regs_query = "MATCH (r:Regulation) RETURN r.regulationId AS id ORDER BY id"
     with driver.session() as s:
@@ -140,7 +140,7 @@ def compute_dynamic_jaccard(driver):
 
 def create_indexes(driver):
     """Create indexes for new SubDomain density properties."""
-    print("\n[BATCH 9] Creating indexes for density properties...")
+    print("\n[Density Metrics] Creating indexes for density properties...")
 
     indexes = [
         "CREATE INDEX subdomain_density_score IF NOT EXISTS FOR (sd:SubDomain) ON (sd.densityScore)",
@@ -163,7 +163,7 @@ def create_indexes(driver):
 
 def verify(driver):
     """Verify all SubDomain properties are set."""
-    print("\n[BATCH 9] Verification query...")
+    print("\n[Density Metrics] Verification query...")
 
     with driver.session() as s:
         query = """
@@ -207,7 +207,7 @@ def verify(driver):
 
 def main():
     print("=" * 60)
-    print("BATCH 9: Dynamic Jaccard + Density Metrics")
+    print("Density Metrics: Dynamic Jaccard + SubDomain density")
     print("=" * 60)
 
     driver = get_driver()
@@ -216,7 +216,7 @@ def main():
         compute_subdomain_metrics(driver)
         compute_dynamic_jaccard(driver)
         verify(driver)
-        print("\n[BATCH 9] Complete.")
+        print("\n[Density Metrics] Complete.")
     finally:
         driver.close()
 

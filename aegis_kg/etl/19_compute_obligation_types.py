@@ -1,5 +1,5 @@
 """
-Batch 17 — Obligation Type Analysis
+Obligation Type Analysis
 Computes per-Regulation and per-SubDomain obligation type distributions.
 
 Regulations have obligation types: CONTINUOUS, ONE_TIME, PERIODIC, TRIGGERED
@@ -145,7 +145,7 @@ def main():
 
     driver.close()
 
-    print(f"\n[Batch 17] Obligation Type Analysis: {len(reg_updates)} regulations, {sd_updates} subdomains")
+    print(f"\n[Obligation Types] Obligation Type Analysis: {len(reg_updates)} regulations, {sd_updates} subdomains")
 
 
 if __name__ == "__main__":

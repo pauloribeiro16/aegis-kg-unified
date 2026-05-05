@@ -1,5 +1,5 @@
 """
-Batch 16 — Temporal Applicability Map
+Temporal Applicability Map
 Populates missing regulatory milestone dates on Regulation nodes:
   - complianceDeadline: date by which regulated entities must comply
   - enforcementDate: date when penalties/sanctions begin
@@ -175,7 +175,7 @@ def main():
                   f"tier={tier}, days_to_comply={days_to_comply}, days_to_enforce={days_to_enforce}")
 
     driver.close()
-    print(f"\n[Batch 16] Temporal Applicability Map computed for 5 regulations")
+    print(f"\n[Temporal Applicability] Temporal Applicability Map computed for 5 regulations")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batch 10 ETL: NI-Weighted Coverage.
+NI-Weighted Coverage.
 
 For each SubDomain:
   - effectiveCoverage: float — sum(normativeIntensity * weight) per mapped clause
@@ -13,7 +13,7 @@ For each Regulation:
   - effectiveCoverageScore: float — sum of all clause NI values for this regulation's clauses
   - effectiveCoverageTier: string — HIGH, MEDIUM, LOW
 
-Requires: Batch 9 (clauseCount, avgNormativeIntensity must already be set).
+Requires: clauseCount and avgNormativeIntensity must already be set on SubDomain.
 """
 
 import os
@@ -35,7 +35,7 @@ def get_driver():
 
 def compute_effective_coverage(driver):
     """Compute NI-weighted effective coverage for SubDomains."""
-    print("[BATCH 10] Computing NI-weighted effective coverage...")
+    print("[Effective Coverage] Computing NI-weighted effective coverage...")
 
     query = """
     MATCH (sd:SubDomain)
@@ -65,7 +65,7 @@ def compute_effective_coverage(driver):
     with driver.session() as s:
         rows = [dict(r) for r in s.run(query)]
 
-    print(f"[BATCH 10] Updated {len(rows)} SubDomain nodes.")
+    print(f"[Effective Coverage] Updated {len(rows)} SubDomain nodes.")
     for r in rows[:10]:
         print(f"  {r['id']}: effectiveCoverage={r['effectiveCoverage']}, tier={r['tier']}, avgNI={r['avgNI']}")
 
@@ -74,7 +74,7 @@ def compute_effective_coverage(driver):
 
 def compute_regulation_effective_coverage(driver):
     """Compute NI-weighted effective coverage per Regulation."""
-    print("\n[BATCH 10] Computing effective coverage per regulation...")
+    print("\n[Effective Coverage] Computing effective coverage per regulation...")
 
     query = """
     MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
@@ -117,7 +117,7 @@ def compute_regulation_effective_coverage(driver):
 
 def verify(driver):
     """Verify effective coverage properties are set."""
-    print("\n[BATCH 10] Verification...")
+    print("\n[Effective Coverage] Verification...")
 
     with driver.session() as s:
         r = s.run("""
@@ -152,7 +152,7 @@ def verify(driver):
 
 def main():
     print("=" * 60)
-    print("BATCH 10: NI-Weighted Coverage")
+    print("Effective Coverage: NI-Weighted Coverage")
     print("=" * 60)
 
     driver = get_driver()
@@ -160,7 +160,7 @@ def main():
         compute_effective_coverage(driver)
         compute_regulation_effective_coverage(driver)
         verify(driver)
-        print("\n[BATCH 10] Complete.")
+        print("\n[Effective Coverage] Complete.")
     finally:
         driver.close()
 

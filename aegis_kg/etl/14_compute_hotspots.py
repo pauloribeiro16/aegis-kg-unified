@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Batch 12 ETL: Multi-Regulation Hotspots.
+Multi-Regulation Hotspots.
 
 For each SubDomain:
   - hotspotScore: Integer — number of regulations covering this SubDomain (= regulationCount)
   - hotspotTier: String — CRITICAL (5 regs), HIGH (4 regs), MODERATE (3 regs), LOW (1-2 regs)
 
-Requires: Batch 9 (regulationCount must already be set).
+Requires: regulationCount must already be set on SubDomain.
 """
 
 import os
@@ -28,7 +28,7 @@ def get_driver():
 
 def compute_hotspots(driver):
     """Compute hotspot score and tier for SubDomains."""
-    print("[BATCH 12] Computing hotspot metrics...")
+    print("[Hotspots] Computing hotspot metrics...")
 
     query = """
     MATCH (sd:SubDomain)
@@ -51,7 +51,7 @@ def compute_hotspots(driver):
     with driver.session() as s:
         rows = [dict(r) for r in s.run(query)]
 
-    print(f"[BATCH 12] Updated {len(rows)} SubDomain nodes.")
+    print(f"[Hotspots] Updated {len(rows)} SubDomain nodes.")
     print("  Tier distribution:")
     from collections import Counter
     tiers = Counter(r['hotspotTier'] for r in rows)
@@ -64,7 +64,7 @@ def compute_hotspots(driver):
 
 def verify(driver):
     """Verify hotspot properties are set."""
-    print("\n[BATCH 12] Verification...")
+    print("\n[Hotspots] Verification...")
 
     with driver.session() as s:
         nulls = [dict(r) for r in s.run(
@@ -87,14 +87,14 @@ def verify(driver):
 
 def main():
     print("=" * 60)
-    print("BATCH 12: Multi-Regulation Hotspots")
+    print("Hotspots: Multi-Regulation Hotspots")
     print("=" * 60)
 
     driver = get_driver()
     try:
         compute_hotspots(driver)
         verify(driver)
-        print("\n[BATCH 12] Complete.")
+        print("\n[Hotspots] Complete.")
     finally:
         driver.close()
 

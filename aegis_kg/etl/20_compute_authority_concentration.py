@@ -1,5 +1,5 @@
 """
-Batch 18 — Authority Concentration Map
+Authority Concentration Map
 Creates RegulatoryAuthority nodes representing the regulatory authorities
 (ENISA, DPAs, NCAs, EU AI Office, ESAs) and computes their influence
 based on sole-authority SubDomain concentration.
@@ -131,7 +131,7 @@ def main():
                   f"influenceScore={influence_score}")
 
     driver.close()
-    print("\n[Batch 18] Authority Concentration Map computed")
+    print("\n[Authority Concentration] Authority Concentration Map computed")
 
 
 if __name__ == "__main__":

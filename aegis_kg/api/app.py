@@ -207,7 +207,7 @@ def gap_analysis():
 
 @app.route('/api/coverage', methods=['GET'])
 def coverage():
-    """Coverage analysis by regulation, domain, and subdomain (Batch 9: dynamic density)"""
+    """Coverage analysis by regulation, domain, and subdomain"""
     reg_cypher = """
     MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
     WITH r.regulationId AS reg, r.name AS regName,
@@ -269,7 +269,7 @@ def coverage():
 
 @app.route('/api/heatmap', methods=['GET'])
 def heatmap():
-    """38×5 heatmap matrix: clause counts per SubDomain per Regulation (Batch 11)"""
+    """38x5 heatmap matrix: clause counts per SubDomain per Regulation"""
     cypher = """
     MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
     WITH r.regulationId AS regId, sd.subDomainId AS sdId, sd.name AS sdName,
@@ -308,7 +308,7 @@ def heatmap():
 
 @app.route('/api/hotspots', methods=['GET'])
 def get_hotspots():
-    """SubDomains covered by 3+ regulations — regulatory hotspots (Batch 12)"""
+    """SubDomains covered by 3+ regulations — regulatory hotspots"""
     cypher = """
     MATCH (sd:SubDomain)
     WHERE sd.hotspotScore >= 3
@@ -357,7 +357,7 @@ def traceability():
 
 @app.route('/api/overlap', methods=['GET'])
 def overlap():
-    """Regulation overlap analysis using ComplementarityAnalysis nodes (Batch 9: dynamic Jaccard)"""
+    """Regulation overlap analysis using ComplementarityAnalysis nodes"""
     cypher = """
     MATCH (ca:ComplementarityAnalysis)-[:OVERLAPS_WITH]->(r:Regulation)
     WITH ca, collect(r.regulationId) AS regs
@@ -382,7 +382,7 @@ def overlap():
 
 @app.route('/api/domains', methods=['GET'])
 def get_domains():
-    """List all domains and their sub-domains with density metrics (Batch 9)"""
+    """List all domains and their sub-domains with density metrics"""
     cypher = """
     MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
     RETURN d.domainId AS domainId, d.name AS domainName, d.description AS domainDescription,
@@ -451,7 +451,7 @@ def get_sole_authority():
 
 @app.route('/api/interactions', methods=['GET'])
 def get_regulatory_interactions():
-    """Full regulatory interaction summary: overlaps, tensions, timelines (Batch 9)"""
+    """Full regulatory interaction summary: overlaps, tensions, timelines"""
     overlap_cypher = """
     MATCH (ca:ComplementarityAnalysis)-[:OVERLAPS_WITH]->(r:Regulation)
     WITH ca, collect(r.regulationId) AS regs

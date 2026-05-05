@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batch 14 ETL: Conflict Severity Score.
+Conflict Severity Score.
 
 Computes conflictSeverityScore for each ComplementarityAnalysis node:
   conflictSeverityScore = dynamicJaccard * 0.4 + niDelta_normalized * 0.3 + timeline_normalized * 0.3
@@ -9,7 +9,7 @@ Where:
   - niDelta_normalized: niDelta / max_niDelta across all pairs
   - timeline_normalized: based on notification deadline differences (24h vs 72h = 0.5, etc.)
 
-Requires: Batch 9 (dynamicJaccard), Batch 13 (normativeIntensityDelta on StrategicTensions).
+Requires: dynamicJaccard on ComplementarityAnalysis, normativeIntensityDelta on StrategicTensions.
 """
 
 import os
@@ -41,7 +41,7 @@ TIMELINE_MAP = {
 
 def compute_severity(driver):
     """Compute conflictSeverityScore for each ComplementarityAnalysis pair."""
-    print("[BATCH 14] Computing conflict severity scores...")
+    print("[Conflict Severity] Computing conflict severity scores...")
 
     ni_query = """
     MATCH (ca:ComplementarityAnalysis)-[:OVERLAPS_WITH]->(r:Regulation)
@@ -111,7 +111,7 @@ def compute_severity(driver):
 
 def verify(driver):
     """Verify severity scores are set."""
-    print("\n[BATCH 14] Verification...")
+    print("\n[Conflict Severity] Verification...")
     with driver.session() as s:
         r = s.run("""
         MATCH (ca:ComplementarityAnalysis)
@@ -125,13 +125,13 @@ def verify(driver):
 
 def main():
     print("=" * 60)
-    print("BATCH 14: Conflict Severity Score")
+    print("Conflict Severity: Conflict Severity Score")
     print("=" * 60)
     driver = get_driver()
     try:
         compute_severity(driver)
         verify(driver)
-        print("\n[BATCH 14] Complete.")
+        print("\n[Conflict Severity] Complete.")
     finally:
         driver.close()
 

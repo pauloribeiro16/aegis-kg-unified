@@ -1,0 +1,63 @@
+{
+  "timestamp": "20260505_111545",
+  "tasks_file": "aegis_eval/task_bank.yaml",
+  "trials": 1,
+  "total_trials": 1,
+  "by_category": {
+    "coverage": {
+      "count": 1,
+      "avg_scores": {
+        "cypher_correctness": 4.0,
+        "query_effectiveness": 4.0,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.5,
+        "reasoning_quality": 4.0
+      }
+    }
+  },
+  "by_difficulty": {
+    "medium": {
+      "count": 1,
+      "avg_scores": {
+        "cypher_correctness": 4.0,
+        "query_effectiveness": 4.0,
+        "feedback_loop_benefit": 3.0,
+        "tool_usage": 4.5,
+        "reasoning_quality": 4.0
+      }
+    }
+  },
+  "by_dimension": {
+    "cypher_correctness": {
+      "query_avg": 3.0,
+      "answer_avg": 5.0,
+      "overall_avg": 4.0
+    },
+    "query_effectiveness": {
+      "query_avg": 4.0,
+      "answer_avg": 4.0,
+      "overall_avg": 4.0
+    },
+    "feedback_loop_benefit": {
+      "query_avg": 3.0,
+      "answer_avg": 3.0,
+      "overall_avg": 3.0
+    },
+    "tool_usage": {
+      "query_avg": 4.0,
+      "answer_avg": 5.0,
+      "overall_avg": 4.5
+    },
+    "reasoning_quality": {
+      "query_avg": 4.0,
+      "answer_avg": 4.0,
+      "overall_avg": 4.0
+    }
+  },
+  "avg_latency_ms": {
+    "agent": 22074.00598526001,
+    "judge": 36789.33119773865,
+    "total": 55185.014963150024
+  },
+  "pass_rate": 1.0
+}

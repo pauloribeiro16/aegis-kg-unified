@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batch 13 ETL: Dynamic Strategic Tensions.
+Dynamic Strategic Tensions.
 
 Detects regulatory tensions from graph topology and updates StrategicTension nodes:
   - conflictType: TEMPORAL_CONFLICT (different obligationTypes), REQUIREMENT_CONFLICT (NI delta > 0.5), ALIGNMENT_OPPORTUNITY
@@ -12,7 +12,7 @@ Detection logic:
   2. Calculate avgNI delta between regulations per shared SubDomain
   3. Classify tension type based on these metrics
 
-Requires: Batch 9 (regulationCount, avgNormativeIntensity), Batch 12 (hotspotScore/tier).
+Requires: regulationCount, avgNormativeIntensity, hotspotScore/tier on SubDomain.
 """
 
 import os
@@ -34,7 +34,7 @@ def get_driver():
 
 def detect_obligations_mismatch(driver):
     """Find SubDomains where regulations have different obligation types."""
-    print("[BATCH 13] Detecting obligation type mismatches...")
+    print("[Strategic Tensions] Detecting obligation type mismatches...")
     query = """
     MATCH (c1:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPPED_TO]-(c2:Clause)
     WHERE c1.regulationId < c2.regulationId
@@ -55,7 +55,7 @@ def detect_obligations_mismatch(driver):
 
 def detect_ni_delta(driver):
     """Find regulation pairs with significant NI delta on shared SubDomains."""
-    print("[BATCH 13] Detecting NI delta conflicts...")
+    print("[Strategic Tensions] Detecting NI delta conflicts...")
     query = """
     MATCH (c1:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPPED_TO]-(c2:Clause)
     WHERE c1.regulationId < c2.regulationId
@@ -77,7 +77,7 @@ def detect_ni_delta(driver):
 
 def detect_alignment_opportunities(driver):
     """Find SubDomains where regulations align well."""
-    print("[BATCH 13] Detecting alignment opportunities...")
+    print("[Strategic Tensions] Detecting alignment opportunities...")
     query = """
     MATCH (c1:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPPED_TO]-(c2:Clause)
     WHERE c1.regulationId < c2.regulationId
@@ -99,7 +99,7 @@ def detect_alignment_opportunities(driver):
 
 def update_strategic_tensions(driver):
     """Update existing StrategicTension nodes with dynamic properties."""
-    print("[BATCH 13] Updating existing StrategicTension nodes...")
+    print("[Strategic Tensions] Updating existing StrategicTension nodes...")
 
     mismatches = detect_obligations_mismatch(driver)
     ni_deltas = detect_ni_delta(driver)
@@ -186,7 +186,7 @@ def update_strategic_tensions(driver):
 
 def verify(driver):
     """Verify tension properties are set."""
-    print("\n[BATCH 13] Verification...")
+    print("\n[Strategic Tensions] Verification...")
     with driver.session() as s:
         r = s.run("""
         MATCH (st:StrategicTension)
@@ -200,13 +200,13 @@ def verify(driver):
 
 def main():
     print("=" * 60)
-    print("BATCH 13: Dynamic Strategic Tensions")
+    print("Strategic Tensions: Dynamic Strategic Tensions")
     print("=" * 60)
     driver = get_driver()
     try:
         update_strategic_tensions(driver)
         verify(driver)
-        print("\n[BATCH 13] Complete.")
+        print("\n[Strategic Tensions] Complete.")
     finally:
         driver.close()
 
