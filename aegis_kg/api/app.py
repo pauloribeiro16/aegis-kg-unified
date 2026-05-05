@@ -267,6 +267,45 @@ def coverage():
     }
     return jsonify(response)
 
+@app.route('/api/heatmap', methods=['GET'])
+def heatmap():
+    """38×5 heatmap matrix: clause counts per SubDomain per Regulation (Batch 11)"""
+    cypher = """
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    WITH r.regulationId AS regId, sd.subDomainId AS sdId, sd.name AS sdName,
+         count(c) AS clauseCount,
+         sum(c.normativeIntensity) AS totalNI,
+         avg(c.normativeIntensity) AS avgNI
+    RETURN regId, sdId, sdName, clauseCount, totalNI, avgNI
+    ORDER BY sdId, regId
+    """
+    results = exec_cypher(cypher)
+    if isinstance(results, dict) and 'error' in results:
+        return jsonify(results), 500
+
+    rows = format_results(results)
+
+    matrix = {}
+    for row in rows:
+        sd_id = row['sdId']
+        if sd_id not in matrix:
+            matrix[sd_id] = {
+                'subDomainId': sd_id,
+                'subDomainName': row['sdName'],
+                'regulations': {}
+            }
+        matrix[sd_id]['regulations'][row['regId']] = {
+            'clauseCount': row['clauseCount'],
+            'totalNI': row['totalNI'],
+            'avgNI': round(row['avgNI'], 2)
+        }
+
+    heatmap_list = [matrix[k] for k in sorted(matrix.keys())]
+    return jsonify({
+        "heatmap": heatmap_list,
+        "description": "38 SubDomains × 5 Regulations matrix. Each cell shows clauseCount, totalNI, and avgNI."
+    })
+
 @app.route('/api/applicability', methods=['GET'])
 def applicability():
     """Show applicable regulations and clause counts"""

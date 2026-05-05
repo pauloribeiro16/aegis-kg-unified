@@ -692,3 +692,51 @@ tasks:
     - sd.clauseCount
     - sd.avgNormativeIntensity
     - sd.coveringRegulations
+- id: heatmap_regulation_subdomain
+  category: coverage
+  difficulty: medium
+  question: Show the clause count, total normative intensity, and average NI for each subdomain-regulation pair
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, sd.subDomainId AS subdomain, sd.name AS subdomainName,
+    count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
+    ORDER BY subdomain, regulation'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - subdomain
+    - subdomainName
+    - clauseCount
+    - totalNI
+    - avgNI
+- id: heatmap_subdomain_regulation_coverage
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are covered by each regulation and how many total clauses does each regulation contribute?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, sd.subDomainId AS subdomain,
+    count(c) AS totalClausesPerRegPerSd, sum(c.normativeIntensity) AS totalNI
+    ORDER BY regulation, subdomain'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - subdomain
+    - totalClausesPerRegPerSd
+    - totalNI
+- id: heatmap_regulation_with_most_clauses_per_subdomain
+  category: coverage
+  difficulty: medium
+  question: Which regulation has the most clauses per subdomain, showing clause count and NI for each?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN sd.subDomainId AS subdomain, sd.name AS subdomainName,
+    r.regulationId AS regulation, count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI
+    ORDER BY subdomain, clauseCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - subdomain
+    - subdomainName
+    - regulation
+    - clauseCount
+    - totalNI

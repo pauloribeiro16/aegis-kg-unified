@@ -235,6 +235,16 @@ MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10.0 RETURN sd.subDomainId, s
 
 MATCH (r:Regulation) WHERE r.effectiveCoverageTier IS NOT NULL RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC
 
+### HEATMAP PATTERNS (Batch 11)
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+RETURN sd.subDomainId, sd.name AS subdomain, r.regulationId AS regulation,
+       count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
+ORDER BY sd.subDomainId, r.regulationId
+
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
+RETURN sdId, sdName, regs, totalClauses ORDER BY totalClauses DESC
+
 """
 
 EXAMPLES = [

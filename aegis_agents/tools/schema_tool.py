@@ -128,6 +128,18 @@ MATCH (sd:SubDomain) RETURN sd.effectiveCoverageTier AS tier, count(*) AS count 
 MATCH (r:Regulation) WHERE r.effectiveCoverageScore IS NOT NULL
 RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier
 ORDER BY r.effectiveCoverageScore DESC
+
+// Heatmap: clause count per SubDomain per Regulation (Batch 11)
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+RETURN sd.subDomainId, sd.name AS subdomain, r.regulationId AS regulation,
+       count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
+ORDER BY sd.subDomainId, r.regulationId
+
+// Heatmap: which regulations cover each subdomain
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
+RETURN sdId, sdName, regs, totalClauses
+ORDER BY totalClauses DESC
 """
 
 
