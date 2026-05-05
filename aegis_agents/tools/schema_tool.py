@@ -148,6 +148,17 @@ ORDER BY sd.hotspotScore DESC
 
 // Subdomains by hotspot tier
 MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier
+
+// Strategic Tensions (Batch 13)
+MATCH (st:StrategicTension)-[:INVOLVES_REGULATION]->(r:Regulation)
+WITH st, collect(r.regulationId) AS regs, st.conflictType AS conflictType, st.severity AS severity
+RETURN st.tensionId AS tensionId, regs, conflictType, severity, st.description AS description
+ORDER BY severity DESC
+
+MATCH (st:StrategicTension)-[:AFFECTS_SUBDOMAIN]->(sd:SubDomain)
+RETURN st.tensionId AS tensionId, st.conflictType AS conflictType, st.severity AS severity,
+       sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.description AS description
+ORDER BY sd.subDomainId
 """
 
 

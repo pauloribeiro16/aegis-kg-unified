@@ -796,3 +796,51 @@ tasks:
     - sd.name
     - sd.hotspotScore
     - sd.coveringRegulations
+- id: strategic_tensions_list
+  category: coverage
+  difficulty: medium
+  question: List all strategic tensions between regulations
+  expected_cypher: 'MATCH (st:StrategicTension)-[:INVOLVES_REGULATION]->(r:Regulation)
+    WITH st, collect(r.regulationId) AS regs, st.conflictType AS conflictType, st.severity AS severity
+    RETURN st.tensionId AS tensionId, regs, conflictType, severity, st.description AS description
+    ORDER BY severity DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - tensionId
+    - regs
+    - conflictType
+    - severity
+    - description
+- id: tensions_by_subdomain
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are affected by strategic tensions?
+  expected_cypher: 'MATCH (st:StrategicTension)-[:AFFECTS_SUBDOMAIN]->(sd:SubDomain)
+    RETURN sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.tensionId AS tensionId,
+    st.conflictType AS conflictType, st.severity AS severity
+    ORDER BY subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - subDomainName
+    - tensionId
+    - conflictType
+    - severity
+- id: critical_tensions_detail
+  category: coverage
+  difficulty: easy
+  question: Which strategic tensions are CRITICAL severity?
+  expected_cypher: 'MATCH (st:StrategicTension)
+    WHERE st.severity = ''CRITICAL''
+    RETURN st.tensionId AS tensionId, st.conflictType AS conflictType,
+    st.description AS description, st.severity AS severity
+    ORDER BY tensionId'
+  expected_result:
+    row_count: null
+    columns:
+    - tensionId
+    - conflictType
+    - description
+    - severity
