@@ -12,7 +12,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 
 ### SIDE A — AEGIS REGULATORY (EU Regulations)
 
-1. Regulation(regulationId, label, description, euReference, clauseCount, effectiveCoverageScore, effectiveCoverageTier, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement)
+1. Regulation(regulationId, label, description, euReference, clauseCount, effectiveCoverageScore, effectiveCoverageTier, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement, obligationProfile, dominantObligationType, continuousObligationRatio, urgencyIndex)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
    - effectiveCoverageScore: float — sum of all clause NI values (higher = more regulatory pressure)
    - effectiveCoverageTier: string — 'HIGH' (>=50), 'MEDIUM' (>=25), 'LOW' (<25)
@@ -23,6 +23,11 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - urgencyTier: string — 'PAST_DUE', 'CRITICAL' (<=90 days), 'URGENT' (<=365 days), 'ON_TRACK' (>365 days)
      - daysToCompliance: integer — days until compliance deadline (negative = past due)
      - daysToEnforcement: integer — days until enforcement date (negative = enforcement active)
+   - BATCH 17 properties (obligation type analysis):
+     - obligationProfile: JSON string — e.g. '{"CONTINUOUS":18,"ONE_TIME":1,"PERIODIC":6,"TRIGGERED":4}'
+     - dominantObligationType: most frequent obligation type (CONTINUOUS, ONE_TIME, PERIODIC, TRIGGERED)
+     - continuousObligationRatio: CONTINUOUS clauses / total clauses
+     - urgencyIndex: float [0..1] — weighted composite: (continuous*1.0 + triggered*0.7 + periodic*0.5 + oneTime*0.3) / total
 
  2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
    - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
@@ -38,7 +43,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
  5. Domain(domainId, name, description)
    - 10 nodes: D-01 through D-10
 
- 6. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
+ 6. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -59,6 +64,10 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - gapDensityTier: string — 'DENSE' (>=0.5), 'MODERATE' (>=0.2), 'SPARSE' (<0.2)
      - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
      - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
+   - BATCH 17 properties (obligation type analysis):
+     - dominantObligationType: most frequent obligation type of clauses mapped to this SubDomain
+     - continuousObligationRatio: CONTINUOUS clauses / total mapped clauses
+     - obligationUrgencyIndex: float [0..1] — same formula as Regulation.urgencyIndex applied to SubDomain clauses
 
 7. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
@@ -223,6 +232,21 @@ MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
 WHERE r.regulationId = 'AIAct'
 RETURN t.eventType, t.eventDate, t.description
 ORDER BY t.eventDate
+
+// Obligation Type Analysis (Batch 17)
+MATCH (r:Regulation)
+RETURN r.regulationId, r.name, r.obligationProfile, r.dominantObligationType,
+       r.continuousObligationRatio, r.urgencyIndex
+ORDER BY r.urgencyIndex DESC
+
+MATCH (sd:SubDomain)
+WHERE sd.dominantObligationType IS NOT NULL
+RETURN sd.subDomainId, sd.name, sd.dominantObligationType, sd.continuousObligationRatio, sd.obligationUrgencyIndex
+ORDER BY sd.obligationUrgencyIndex DESC
+
+MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS'
+RETURN sd.subDomainId, sd.name, sd.obligationUrgencyIndex, sd.continuousObligationRatio
+ORDER BY sd.continuousObligationRatio DESC
 """
 
 

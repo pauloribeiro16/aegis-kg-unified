@@ -956,3 +956,41 @@ tasks:
     - complianceDeadline
     - enforcementDate
     - urgencyTier
+- id: urgency_index_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulation has the highest obligation urgency index?
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.name, r.dominantObligationType, r.continuousObligationRatio, r.urgencyIndex ORDER BY r.urgencyIndex DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - name
+    - dominantObligationType
+    - continuousObligationRatio
+    - urgencyIndex
+- id: obligation_profile_dora
+  category: coverage
+  difficulty: easy
+  question: What is the obligation type profile for DORA?
+  expected_cypher: "MATCH (r:Regulation {regulationId: 'DORA'}) RETURN r.regulationId, r.obligationProfile, r.dominantObligationType, r.continuousObligationRatio, r.urgencyIndex"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - obligationProfile
+    - dominantObligationType
+    - continuousObligationRatio
+    - urgencyIndex
+- id: continuous_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are dominated by CONTINUOUS obligations and have the highest urgency?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS' RETURN sd.subDomainId, sd.name, sd.continuousObligationRatio, sd.obligationUrgencyIndex ORDER BY sd.obligationUrgencyIndex DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - continuousObligationRatio
+    - obligationUrgencyIndex
