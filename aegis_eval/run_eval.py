@@ -304,7 +304,7 @@ def run_eval(
             avg_scores = result.get("avg_scores", {})
             if avg_scores:
                 overall_avg = sum(avg_scores.values()) / len(avg_scores)
-                status = "PASS" if overall_avg >= 3 else "WARN"
+                status = "FAIL" if overall_avg == 0 else ("PASS" if overall_avg >= 3 else "WARN")
                 dim_scores = " ".join([f"{k[:4]}={v:.1f}" for k, v in avg_scores.items()])
                 print(f"  [{status}] {result['trial_id']} | {dim_scores} | {result['latency_ms']['total']/1000:.1f}s")
             else:
