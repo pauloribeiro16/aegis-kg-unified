@@ -24,23 +24,34 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 
 ### SIDE A — AEGIS REGULATORY (EU Regulations)
 
-1. Regulation(regulationId, label, description, euReference, clauseCount, applicabilityConditionCount)
+1. Regulation(regulationId, label, description, euReference, clauseCount, applicabilityConditionCount, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
-   - KNOWN ISSUE: name, fullName, effectiveDate, lastAmended, notificationTimelines are NULL
+   - KNOWN ISSUE: name, fullName, lastAmended, notificationTimelines are NULL (effectiveDate IS populated)
+   - BATCH 16 properties (temporal applicability):
+     - complianceDeadline: date — deadline for organizations to comply
+     - enforcementDate: date — date penalties/sanctions begin
+     - applicationDate: date — date the regulation starts applying to organizations
+     - urgencyTier: string — 'PAST_DUE', 'CRITICAL' (<=90 days), 'URGENT' (<=365 days), 'ON_TRACK' (>365 days)
+     - daysToCompliance: integer — days until compliance deadline (negative = past due)
+     - daysToEnforcement: integer — days until enforcement date (negative = enforcement active)
 
-2. Article(articleId, number, title)
+2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
+   - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
+   - Relationship: (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
+
+3. Article(articleId, number, title)
    - 47 nodes total
    - KNOWN ISSUE: regulationId is NULL on all articles; chapter, section, obligationType are empty
 
-3. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
+4. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
    - 150 nodes total
    - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
    - KNOWN ISSUE: applicable is NULL on all clauses; sourceReference and crossReferences are empty
 
-4. Domain(domainId, name)
+5. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
+6. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -57,12 +68,12 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - hotspotScore: integer — number of regulations covering this SubDomain (same as regulationCount)
      - hotspotTier: string — 'CRITICAL' (>=5 regs), 'HIGH' (>=4), 'MODERATE' (>=3), 'LOW' (<3)
    - BATCH 15 properties (gap density):
-     - gapDensityScore: float [0..1] — balance of clause distribution across regulations (1=perfectly balanced, 0=highly unbalanced); based on coefficient of variation of clause counts per regulation
+     - gapDensityScore: float [0..1] — balance of clause distribution across regulations (1=perfectly balanced, 0=highly unbalanced); based on coefficient of variation
      - gapDensityTier: string — 'DENSE' (>=0.5), 'MODERATE' (>=0.2), 'SPARSE' (<0.2)
      - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
      - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
 
-6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+7. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
    - BATCH 9: dynamic Jaccard computed from actual graph data
      - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
@@ -70,10 +81,10 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - jaccardSource: 'DYNAMIC' — indicates computed from graph
    - jaccardIndex: original static value (kept for reference)
 
-7. StrategicTension(tensionId, description, severity)
+8. StrategicTension(tensionId, description, severity)
    - 4 nodes with real regulatory conflicts (GDPR vs CRA, GDPR vs NIS2, DPIA vs AI Act, NIS2 vs DORA alignment)
 
-8. ApplicabilityCondition(conditionId, description)
+9. ApplicabilityCondition(conditionId, description)
    - 12 nodes with per-regulation applicability rules
    - KNOWN ISSUE: conditionType is NULL
 
@@ -105,6 +116,7 @@ Regulatory side:
 - (StrategicTension)-[:INVOLVES_REGULATION]->(Regulation)
 - (StrategicTension)-[:INVOLVES_CLAUSE]->(Clause)
 - (Regulation)-[:HAS_APPLICABILITY]->(ApplicabilityCondition)
+- (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
 - (SubDomain)-[:HAS_METRICS]->(SubDomainMetrics)
 
 NIST CSF side:
@@ -298,6 +310,22 @@ ORDER BY sd.gapDensityScore DESC
 MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE'
 RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations
 ORDER BY sd.gapDensityScore ASC, sd.regulationCount DESC
+
+### TEMPORAL APPLICABILITY PATTERNS (Batch 16)
+MATCH (r:Regulation)
+RETURN r.regulationId, r.name, r.effectiveDate, r.applicationDate,
+       r.complianceDeadline, r.enforcementDate, r.urgencyTier,
+       r.daysToCompliance, r.daysToEnforcement
+ORDER BY r.daysToCompliance ASC
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+RETURN r.regulationId, t.eventType, t.eventDate, t.description
+ORDER BY r.regulationId, t.eventDate
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+WHERE r.regulationId = 'AIAct'
+RETURN t.eventType, t.eventDate, t.description
+ORDER BY t.eventDate
 
 """
 

@@ -12,22 +12,33 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 
 ### SIDE A — AEGIS REGULATORY (EU Regulations)
 
-1. Regulation(regulationId, label, description, euReference, clauseCount, effectiveCoverageScore, effectiveCoverageTier)
+1. Regulation(regulationId, label, description, euReference, clauseCount, effectiveCoverageScore, effectiveCoverageTier, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
    - effectiveCoverageScore: float — sum of all clause NI values (higher = more regulatory pressure)
    - effectiveCoverageTier: string — 'HIGH' (>=50), 'MEDIUM' (>=25), 'LOW' (<25)
+   - BATCH 16 properties (temporal applicability):
+     - complianceDeadline: date — deadline for organizations to comply
+     - enforcementDate: date — date penalties/sanctions begin
+     - applicationDate: date — date the regulation starts applying to organizations
+     - urgencyTier: string — 'PAST_DUE', 'CRITICAL' (<=90 days), 'URGENT' (<=365 days), 'ON_TRACK' (>365 days)
+     - daysToCompliance: integer — days until compliance deadline (negative = past due)
+     - daysToEnforcement: integer — days until enforcement date (negative = enforcement active)
 
-2. Article(articleId, number, title, chapter, summary, obligationType)
+ 2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
+   - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
+   - Relationship: (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
+
+ 3. Article(articleId, number, title, chapter, summary, obligationType)
    - 47 nodes total
 
-3. Clause(clauseId, description, normativeIntensity, regulationId, obligationType, obligatedParty, articleReference, clauseLevel, relevance)
+ 4. Clause(clauseId, description, normativeIntensity, regulationId, obligationType, obligatedParty, articleReference, clauseLevel, relevance)
    - 150 nodes total
    - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
 
-4. Domain(domainId, name, description)
+ 5. Domain(domainId, name, description)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
+ 6. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -49,7 +60,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
      - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
 
-6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+7. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
    - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
    - dynamicSharedSubDomainCount: integer — actual shared SubDomain count
@@ -80,6 +91,7 @@ Regulatory side:
 - (StrategicTension)-[:AFFECTS_SUBDOMAIN]->(SubDomain)
 - (StrategicTension)-[:INVOLVES_REGULATION]->(Regulation)
 - (Regulation)-[:HAS_APPLICABILITY]->(ApplicabilityCondition)
+- (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
 
 NIST CSF side:
 - (Framework)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function nodes]
@@ -195,6 +207,22 @@ ORDER BY sd.gapDensityScore DESC
 MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE'
 RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations
 ORDER BY sd.gapDensityScore ASC, sd.regulationCount DESC
+
+// Temporal Applicability (Batch 16)
+MATCH (r:Regulation)
+RETURN r.regulationId, r.name, r.effectiveDate, r.applicationDate,
+       r.complianceDeadline, r.enforcementDate, r.urgencyTier,
+       r.daysToCompliance, r.daysToEnforcement
+ORDER BY r.daysToCompliance ASC
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+RETURN r.regulationId, t.eventType, t.eventDate, t.description
+ORDER BY r.regulationId, t.eventDate
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+WHERE r.regulationId = 'AIAct'
+RETURN t.eventType, t.eventDate, t.description
+ORDER BY t.eventDate
 """
 
 

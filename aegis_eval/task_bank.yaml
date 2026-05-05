@@ -918,3 +918,41 @@ tasks:
     - gapDensityScore
     - missingRegulations
     - coveringRegulations
+- id: urgency_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulation is most urgent to address based on compliance deadline?
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.name, r.complianceDeadline, r.urgencyTier, r.daysToCompliance ORDER BY r.daysToCompliance ASC"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - name
+    - complianceDeadline
+    - urgencyTier
+    - daysToCompliance
+- id: timeline_events
+  category: coverage
+  difficulty: easy
+  question: What are the key timeline events for the AI Act?
+  expected_cypher: "MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline) WHERE r.regulationId = 'AIAct' RETURN t.eventType, t.eventDate, t.description ORDER BY t.eventDate"
+  expected_result:
+    row_count: null
+    columns:
+    - eventType
+    - eventDate
+    - description
+- id: compliance_timeline_overview
+  category: coverage
+  difficulty: easy
+  question: Show all regulations with their effective date, application date, compliance deadline, and enforcement date
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.effectiveDate, r.applicationDate, r.complianceDeadline, r.enforcementDate, r.urgencyTier ORDER BY r.effectiveDate"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - effectiveDate
+    - applicationDate
+    - complianceDeadline
+    - enforcementDate
+    - urgencyTier
