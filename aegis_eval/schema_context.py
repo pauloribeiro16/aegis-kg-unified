@@ -40,7 +40,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 4. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier)
+5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -53,6 +53,14 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
    - BATCH 10 properties (NI-weighted):
      - effectiveCoverage: float — sum of NI values of all clauses mapped to this SubDomain (higher = stronger regulatory pressure)
      - effectiveCoverageTier: string — 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0)
+   - BATCH 12 properties (multi-regulation hotspots):
+     - hotspotScore: integer — number of regulations covering this SubDomain (same as regulationCount)
+     - hotspotTier: string — 'CRITICAL' (>=5 regs), 'HIGH' (>=4), 'MODERATE' (>=3), 'LOW' (<3)
+   - BATCH 15 properties (gap density):
+     - gapDensityScore: float [0..1] — balance of clause distribution across regulations (1=perfectly balanced, 0=highly unbalanced); based on coefficient of variation of clause counts per regulation
+     - gapDensityTier: string — 'DENSE' (>=0.5), 'MODERATE' (>=0.2), 'SPARSE' (<0.2)
+     - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
+     - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
 
 6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
@@ -273,6 +281,23 @@ WHERE ca.conflictSeverityScore IS NOT NULL
 RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
        ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
 ORDER BY severityScore DESC
+
+### GAP DENSITY PATTERNS (Batch 15)
+MATCH (sd:SubDomain)
+WHERE sd.gapDensityScore IS NOT NULL
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.gapDensityTier,
+       sd.clauseDistribution, sd.missingRegulations
+ORDER BY sd.gapDensityScore DESC
+
+MATCH (sd:SubDomain) RETURN sd.gapDensityTier AS tier, count(*) AS count ORDER BY tier
+
+MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'DENSE'
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.clauseDistribution
+ORDER BY sd.gapDensityScore DESC
+
+MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE'
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations
+ORDER BY sd.gapDensityScore ASC, sd.regulationCount DESC
 
 """
 

@@ -883,3 +883,38 @@ tasks:
     columns:
     - analysisId
     - score
+- id: gap_density_ranking
+  category: coverage
+  difficulty: easy
+  question: Which 5 subdomains have the most balanced clause distribution across regulations?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.gapDensityScore IS NOT NULL RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.gapDensityTier ORDER BY sd.gapDensityScore DESC LIMIT 5"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - gapDensityScore
+    - gapDensityTier
+- id: gap_density_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each gap density tier?
+  expected_cypher: "MATCH (sd:SubDomain) RETURN sd.gapDensityTier AS tier, count(sd) AS count ORDER BY tier"
+  expected_result:
+    row_count: null
+    columns:
+    - tier
+    - count
+- id: gap_density_sparse_analysis
+  category: coverage
+  difficulty: medium
+  question: Which SPARSE subdomains have the most missing regulations?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE' RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations ORDER BY size(sd.missingRegulations) DESC, sd.gapDensityScore ASC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - gapDensityScore
+    - missingRegulations
+    - coveringRegulations
