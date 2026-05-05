@@ -12,8 +12,10 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 
 ### SIDE A — AEGIS REGULATORY (EU Regulations)
 
-1. Regulation(regulationId, label, description, euReference, clauseCount)
+1. Regulation(regulationId, label, description, euReference, clauseCount, effectiveCoverageScore, effectiveCoverageTier)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
+   - effectiveCoverageScore: float — sum of all clause NI values (higher = more regulatory pressure)
+   - effectiveCoverageTier: string — 'HIGH' (>=50), 'MEDIUM' (>=25), 'LOW' (<25)
 
 2. Article(articleId, number, title, chapter, summary, obligationType)
    - 47 nodes total
@@ -25,13 +27,25 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 4. Domain(domainId, name, description)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, description, soleAuthority, gapRisk)
+5. SubDomain(subDomainId, name, description, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
-   - soleAuthority: String — regulation ID with sole authority ('CRA','GDPR','NIS2','DORA','AIAct'), null if shared governance
-   - gapRisk: String — 'HIGH', 'MEDIUM', or 'LOW'
+   - BATCH 9 properties (computed from graph):
+     - clauseCount: integer — count of clauses mapped via MAPPED_TO
+     - regulationCount: integer — count of distinct regulations covering this subdomain
+     - densityScore: float — clauseCount / 5.0 (normalized by max 5 regulations)
+     - avgNormativeIntensity: float — average NI of covering clauses (range 0-3.0)
+     - weightedDensity: float — sum(NI) / 15.0 (NI-weighted, max 1.0)
+     - coveringRegulations: list[string] — regulation IDs covering this subdomain
+   - BATCH 10 properties (NI-weighted):
+     - effectiveCoverage: float — sum of NI values of all clauses mapped to this SubDomain (higher = stronger regulatory pressure)
+     - effectiveCoverageTier: string — 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0)
 
-6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, overlapDescription)
+6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, overlapType, jaccardIndex, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+   - 10 nodes: all regulation pairs (5 choose 2)
+   - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
+   - dynamicSharedSubDomainCount: integer — actual shared SubDomain count
+   - jaccardSource: 'DYNAMIC' or 'STATIC'
 
 ### SIDE B — NIST CSF 2.0 (US Framework)
 
@@ -46,19 +60,23 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 3. FrameworkControl(controlId, frameworkId, categoryId, functionCode, title, description, implementationExamples, references, crossReferences)
    - 106 nodes: e.g., GV.OC-01, PR.DS-01, DE.CM-01, etc.
 
-### RELATIONSHIPS
+### RELATIONSHIPS (Verified — Actual Names)
 
 Regulatory side:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:CONTAINS]->(SubDomain)
-- (Clause)-[:MAPPED_TO]->(SubDomain)
+- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)        [NOT CONTAINS]
+- (Clause)-[:MAPPED_TO]->(SubDomain)          [NOT COVERS_SUBDOMAIN]
+- (Regulation)-[:HAS_TENSION_WITH]->(Regulation)
+- (StrategicTension)-[:AFFECTS_SUBDOMAIN]->(SubDomain)
+- (StrategicTension)-[:INVOLVES_REGULATION]->(Regulation)
+- (Regulation)-[:HAS_APPLICABILITY]->(ApplicabilityCondition)
 
 NIST CSF side:
 - (Framework)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function nodes]
-- (FrameworkCategory)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function→Category]
-- (FrameworkCategory)-[:HAS_CONTROL]->(FrameworkControl)
+- (FrameworkCategory)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function→Category hierarchy]
+- (FrameworkControl)-[:HAS_CONTROL]->(FrameworkCategory)  [rare to traverse]
 - (FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(SubDomain)
 - (FrameworkControl)-[:MAPS_TO_DOMAIN]->(Domain)
 
@@ -93,10 +111,23 @@ MATCH (c:Clause {regulationId: 'GDPR'})-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_
 RETURN sd.name, count(c) AS gdprClauses, count(DISTINCT fc) AS nistControls
 ORDER BY gdprClauses DESC
 
-// Regulatory coverage by domain
-MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+// Regulatory coverage by domain (HAS_SUBDOMAIN, not CONTAINS)
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
 RETURN d.name AS domain, count(DISTINCT c) AS clauseCount
 ORDER BY clauseCount DESC
+
+// Effective coverage ranking (Batch 10)
+MATCH (sd:SubDomain) WHERE sd.effectiveCoverage IS NOT NULL
+RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount
+ORDER BY sd.effectiveCoverage DESC LIMIT 10
+
+// Subdomains by effective coverage tier
+MATCH (sd:SubDomain) RETURN sd.effectiveCoverageTier AS tier, count(*) AS count ORDER BY tier
+
+// Regulations by effective coverage score
+MATCH (r:Regulation) WHERE r.effectiveCoverageScore IS NOT NULL
+RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier
+ORDER BY r.effectiveCoverageScore DESC
 """
 
 

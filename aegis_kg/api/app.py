@@ -209,14 +209,16 @@ def gap_analysis():
 def coverage():
     """Coverage analysis by regulation, domain, and subdomain (Batch 9: dynamic density)"""
     reg_cypher = """
-    MATCH (sd:SubDomain)
-    WITH count(sd) AS totalSD
     MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
-    WITH totalSD, r.regulationId AS reg, r.name AS regName,
-         count(DISTINCT sd) AS regCoverage
+    WITH r.regulationId AS reg, r.name AS regName,
+         count(DISTINCT sd) AS regCoverage,
+         r.effectiveCoverageScore AS effectiveCoverageScore,
+         r.effectiveCoverageTier AS effectiveCoverageTier
+    WITH count(sd) AS totalSD, reg, regName, regCoverage, effectiveCoverageScore, effectiveCoverageTier
     RETURN reg, regName, regCoverage, totalSD,
-           round(100.0 * regCoverage / totalSD, 1) AS coveragePct
-    ORDER BY regCoverage DESC
+           round(100.0 * regCoverage / totalSD, 1) AS coveragePct,
+           effectiveCoverageScore, effectiveCoverageTier
+    ORDER BY effectiveCoverageScore DESC
     """
     reg_results = exec_cypher(reg_cypher)
 
@@ -250,7 +252,9 @@ def coverage():
            sd.densityScore AS densityScore,
            sd.avgNormativeIntensity AS avgNI,
            sd.weightedDensity AS weightedDensity,
-           sd.coveringRegulations AS coveringRegulations
+           sd.coveringRegulations AS coveringRegulations,
+           sd.effectiveCoverage AS effectiveCoverage,
+           sd.effectiveCoverageTier AS effectiveCoverageTier
     ORDER BY domainId, subDomainId
     """
     subdomain_results = exec_cypher(subdomain_cypher)

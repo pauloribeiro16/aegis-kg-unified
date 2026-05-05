@@ -95,6 +95,8 @@ Never claim results are empty, missing, or that none exist when data is returned
 
 SCHEMA CONTEXT:
 - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
+- effectiveCoverage: float — SUM of normativeIntensity values of all clauses mapped to this SubDomain (NOT a ratio or percentage; higher = stronger regulatory pressure; range 0-114)
+- effectiveCoverageTier: 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0) — based on effectiveCoverage
 - obligationType: ONE_TIME, CONTINUOUS, TRIGGERED
 
 QUESTION: {question}

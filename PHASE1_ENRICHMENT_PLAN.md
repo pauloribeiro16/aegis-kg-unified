@@ -14,6 +14,19 @@ This plan adds **14 batches** of dynamic analytical capabilities to Phase 1.
 
 ---
 
+## Schema Files — Both Must Be Updated Together
+
+Two files must always be updated together for every batch (they power the agent and judge):
+
+| File | Used By | Purpose |
+|------|---------|---------|
+| `aegis_agents/tools/schema_tool.py` | LangGraph agent (Cypher generation) | Node properties, relationship names, useful query patterns |
+| `aegis_eval/schema_context.py` | Minimax judge (answer evaluation) | Full schema description + working query patterns |
+
+**Rule:** When adding new properties, add them to BOTH files. When adding query patterns, add them to BOTH files under matching sections.
+
+---
+
 ## Relationship Name Reference (RESOLVED)
 
 | Relationship | Count | Status |
@@ -65,13 +78,25 @@ This plan adds **14 batches** of dynamic analytical capabilities to Phase 1.
 ### Batch 10 — NI-Weighted Coverage
 **Goal:** Weight coverage by normative intensity. SubDomains with high-NI clauses have higher effective coverage.
 
-**Changes:**
-- Add `effectiveCoverage: Float` — sum(NI * weight) per SubDomain
-- Add `regulationEffectiveCoverage: Float` — per regulation, NI-weighted coverage
-- Add `coverageTier: String` — HIGH (avgNI≥2.7), MEDIUM (avgNI≥2.3), LOW (avgNI<2.3)
+**New SubDomain Properties:**
+- `effectiveCoverage: Float` — sum of NI values of all clauses mapped to this SubDomain (max theoretical: 3 × 38 = 114)
+- `effectiveCoverageTier: String` — HIGH (>= 8.0), MEDIUM (>= 4.0), LOW (< 4.0)
+
+**New Regulation Properties:**
+- `effectiveCoverageScore: Float` — sum of all clause NI values for this regulation's clauses
+- `effectiveCoverageTier: String` — HIGH (>= 50.0), MEDIUM (>= 25.0), LOW (< 25.0)
+
+**ETL Script:** `13_compute_effective_coverage.py`
 
 **API New/Modified:**
-- `GET /api/coverage?weighted=true` — NI-weighted coverage
+- `GET /api/coverage` — add `effectiveCoverage`, `effectiveCoverageTier` to `by_subdomain`; add `effectiveCoverageScore`, `effectiveCoverageTier` to `by_regulation`
+
+**Task Bank Additions (5 tasks):**
+- `effective_coverage_top_subdomains`
+- `effective_coverage_tier_distribution`
+- `regulation_effective_coverage_ranking`
+- `low_effective_coverage_subdomains`
+- `high_effective_coverage_detail`
 
 ---
 
@@ -266,10 +291,44 @@ timelinePressureFactor = max(1.0, count(breach_notifications_with_deadline < 72h
 **Iterative approach — one batch at a time:**
 1. Implement batch ETL, schema, API changes
 2. Add task_bank entries for the new capability
-3. Test with agent (run 1 task via eval)
+3. Test **only the new tasks** with agent eval (not the full task bank)
 4. If agent score ≥ 3.0 → commit, move to next batch
-5. If agent score < 3.0 → iterate on prompts/schema, try again
+5. If agent score < 3.0 → diagnose error, fix ETL/schema/API/prompts, retry only the failed task
 6. Never proceed to next batch until current batch passes eval
+
+**CRITICAL — Don't Break Previous Batches:**
+- Never rename or remove properties that previous batches depend on
+- Never change relationship names that are already canonical (HAS_SUBDOMAIN, MAPPED_TO, etc.)
+- Never delete or alter data that earlier ETLs have computed
+- If a new batch needs to change something, create a NEW property with a new name
+
+**Schema Files — Always Update Both:**
+- `aegis_agents/tools/schema_tool.py` (used by LangGraph agent for cypher generation)
+- `aegis_eval/schema_context.py` (used by eval judge for answer evaluation)
+- Update both simultaneously for every batch
+
+**New Batch Checklist:**
+- [ ] ETL script written and run against Neo4j
+- [ ] `aegis_agents/tools/schema_tool.py` — new properties + patterns added
+- [ ] `aegis_eval/schema_context.py` — new properties + patterns added
+- [ ] API endpoints modified or created
+- [ ] Task bank entries added (3–6 per batch)
+- [ ] New tasks tested individually with `run_eval.py --task <id> --trials 1`
+- [ ] All new tasks pass (score ≥ 3.0)
+- [ ] Committed to feature branch
+
+**Diagnosis & Fix Protocol (when a task fails):**
+1. Read the judge JSON output to identify which dimension scored low
+2. Check generated Cypher vs expected Cypher — find the mismatch
+3. If property name wrong → update both schema files
+4. If relationship name wrong → update both schema files
+5. If ETL not computing → re-run ETL or fix it
+6. If API returning wrong shape → fix API endpoint
+7. If query pattern wrong → update schema USEFUL QUERIES section
+8. Re-test only the failed task, not the whole bank
+
+**After All Batches Complete:**
+Run full eval: `PYTHONPATH=. python3 aegis_eval/run_eval.py --tasks aegis_eval/task_bank.yaml --trials 1`
 
 ---
 

@@ -622,3 +622,73 @@ tasks:
     - totalSubdomains
     - avgDensity
     - coveredSubdomains
+- id: effective_coverage_top_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have the highest effective coverage (sum of normative intensities)?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverage IS NOT NULL RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount ORDER BY
+    sd.effectiveCoverage DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.effectiveCoverageTier
+    - sd.clauseCount
+- id: effective_coverage_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each effective coverage tier?
+  expected_cypher: 'MATCH (sd:SubDomain) RETURN sd.effectiveCoverageTier AS tier, count(*) AS count
+    ORDER BY tier'
+  expected_result:
+    row_count: 3
+    columns:
+    - tier
+    - count
+- id: regulation_effective_coverage_ranking
+  category: coverage
+  difficulty: medium
+  question: Which regulations have the highest effective coverage score?
+  expected_cypher: 'MATCH (r:Regulation) WHERE r.effectiveCoverageScore IS NOT NULL RETURN r.regulationId,
+    r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC'
+  expected_result:
+    row_count: 5
+    columns:
+    - r.regulationId
+    - r.name
+    - r.effectiveCoverageScore
+    - r.effectiveCoverageTier
+- id: low_effective_coverage_subdomains
+  category: coverage
+  difficulty: easy
+  question: Which subdomains have LOW effective coverage tier?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverageTier = ''LOW'' RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.clauseCount, sd.coveringRegulations ORDER BY sd.effectiveCoverage'
+  expected_result:
+    row_count: 7
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.clauseCount
+    - sd.coveringRegulations
+- id: high_effective_coverage_detail
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have effective coverage of 10 or higher?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10 RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount, sd.avgNormativeIntensity,
+    sd.coveringRegulations ORDER BY sd.effectiveCoverage DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.effectiveCoverageTier
+    - sd.clauseCount
+    - sd.avgNormativeIntensity
+    - sd.coveringRegulations

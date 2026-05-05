@@ -40,7 +40,7 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 4. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations)
+5. SubDomain(subDomainId, name, soleAuthority, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
    - BATCH 9 properties (computed from graph):
@@ -50,6 +50,9 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
      - avgNormativeIntensity: float — average NI of covering clauses (range 0-3.0)
      - weightedDensity: float — sum(NI) / 15.0 (NI-weighted, max 1.0)
      - coveringRegulations: list[string] — regulation IDs covering this subdomain
+   - BATCH 10 properties (NI-weighted):
+     - effectiveCoverage: float — sum of NI values of all clauses mapped to this SubDomain (higher = stronger regulatory pressure)
+     - effectiveCoverageTier: string — 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0)
 
 6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
    - 10 nodes: all regulation pairs (5 choose 2)
@@ -224,6 +227,13 @@ MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId, d.name, cou
 
 ### DYNAMIC JACCARD (Batch 9)
 MATCH (ca:ComplementarityAnalysis) WHERE ca.jaccardSource = 'DYNAMIC' RETURN ca.regulation1Id, ca.regulation2Id, ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount AS shared ORDER BY jaccardIndex DESC
+
+### NI-WEIGHTED COVERAGE PATTERNS (Batch 10)
+MATCH (sd:SubDomain) WHERE sd.effectiveCoverageTier = 'HIGH' RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier ORDER BY sd.effectiveCoverage DESC LIMIT 10
+
+MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10.0 RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount ORDER BY sd.effectiveCoverage DESC
+
+MATCH (r:Regulation) WHERE r.effectiveCoverageTier IS NOT NULL RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC
 
 """
 
