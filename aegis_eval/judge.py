@@ -196,7 +196,7 @@ def judge_task(task: dict, pipeline_result: dict) -> dict:
         else:
             explanation = str(raw_explanation)
 
-        def clamp(val, default=3):
+        def clamp(val, default=0):
             try:
                 v = int(val)
                 return max(1, min(5, v))
@@ -205,10 +205,10 @@ def judge_task(task: dict, pipeline_result: dict) -> dict:
 
         return {
             "scores": {
-                "cypher_quality": clamp(scores.get("cypher_quality"), 3),
-                "retrieval_accuracy": clamp(scores.get("retrieval_accuracy"), 3),
-                "answer_quality": clamp(scores.get("answer_quality"), 3),
-                "regulatory_reasoning": clamp(scores.get("regulatory_reasoning"), 3)
+                "cypher_quality": clamp(scores.get("cypher_quality"), 0),
+                "retrieval_accuracy": clamp(scores.get("retrieval_accuracy"), 0),
+                "answer_quality": clamp(scores.get("answer_quality"), 0),
+                "regulatory_reasoning": clamp(scores.get("regulatory_reasoning"), 0)
             },
             "explanation": explanation,
             "latency_ms": judge_latency,

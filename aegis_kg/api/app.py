@@ -1,4 +1,3 @@
-import os
 #!/usr/bin/env python3
 """
 AEGIS Phase 1 Knowledge Graph - REST API
@@ -169,8 +168,8 @@ def get_clause(clause_id):
     MATCH (c:Clause {clauseId: $clauseId})
     OPTIONAL MATCH (r:Regulation)-[:HAS_CLAUSE]->(c)
     OPTIONAL MATCH (a:Article)-[:DEFINES]->(c)
-    OPTIONAL MATCH (c)-[:COVERS_SUBDOMAIN]->(sd:SubDomain)
-    OPTIONAL MATCH (d:Domain)-[:CONTAINS]->(sd)
+    OPTIONAL MATCH (c)-[:MAPPED_TO]->(sd:SubDomain)
+    OPTIONAL MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd)
     RETURN c.clauseId AS clauseId, c.number AS number, c.summary AS summary,
            c.description AS description, c.applicable AS applicable,
            c.normativeIntensity AS normativeIntensity, 
@@ -194,8 +193,8 @@ def gap_analysis():
     """Identify sub-domains with NO clause coverage"""
     cypher = """
     MATCH (sd:SubDomain)
-    WHERE NOT (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
-    OPTIONAL MATCH (d:Domain)-[:CONTAINS]->(sd)
+    WHERE NOT (sd)<-[:MAPPED_TO]-(:Clause)
+    OPTIONAL MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd)
     RETURN sd.subDomainId AS subDomainId, sd.name AS name, 
            sd.description AS description, d.domainId AS domainId,
            d.name AS domainName, sd.gapRisk AS riskLevel
@@ -208,25 +207,27 @@ def gap_analysis():
 
 @app.route('/api/coverage', methods=['GET'])
 def coverage():
-    """Coverage analysis by regulation and domain"""
+    """Coverage analysis by regulation, domain, and subdomain"""
     reg_cypher = """
-    MATCH (sd:SubDomain)
-    WITH count(sd) AS totalSD
-    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:COVERS_SUBDOMAIN]->(sd:SubDomain)
-    WITH totalSD, r.regulationId AS reg, r.name AS regName,
-         count(DISTINCT sd) AS regCoverage
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    WITH r.regulationId AS reg, r.name AS regName,
+         count(DISTINCT sd) AS regCoverage,
+         r.effectiveCoverageScore AS effectiveCoverageScore,
+         r.effectiveCoverageTier AS effectiveCoverageTier
+    WITH count(sd) AS totalSD, reg, regName, regCoverage, effectiveCoverageScore, effectiveCoverageTier
     RETURN reg, regName, regCoverage, totalSD,
-           round(100.0 * regCoverage / totalSD, 1) AS coveragePct
-    ORDER BY regCoverage DESC
+           round(100.0 * regCoverage / totalSD, 1) AS coveragePct,
+           effectiveCoverageScore, effectiveCoverageTier
+    ORDER BY effectiveCoverageScore DESC
     """
     reg_results = exec_cypher(reg_cypher)
-    
+
     domain_cypher = """
-    MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)
-    OPTIONAL MATCH (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+    OPTIONAL MATCH (sd)<-[:MAPPED_TO]-(:Clause)
     WITH d.domainId AS domain, d.name AS domainName,
          count(sd) AS totalInDomain,
-         count(DISTINCT CASE WHEN (sd)<-[:COVERS_SUBDOMAIN]-(:Clause) THEN sd END) AS covered
+         count(DISTINCT CASE WHEN (sd)<-[:MAPPED_TO]-(:Clause) THEN sd END) AS covered
     RETURN domain, domainName, totalInDomain, covered,
            round(100.0 * covered / totalInDomain, 1) AS coveragePct
     ORDER BY domain
@@ -236,24 +237,98 @@ def coverage():
     summary_cypher = """
     MATCH (sd:SubDomain)
     WITH count(sd) AS total
-    OPTIONAL MATCH (sd:SubDomain)<-[:COVERS_SUBDOMAIN]-(:Clause)
+    OPTIONAL MATCH (sd:SubDomain)<-[:MAPPED_TO]-(:Clause)
     WITH total, count(DISTINCT sd) AS covered
     RETURN total, covered, round(100.0 * covered / total, 1) AS overallPct
     """
     summary_results = exec_cypher(summary_cypher)
 
+    subdomain_cypher = """
+    MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+    RETURN d.domainId AS domainId, d.name AS domainName,
+           sd.subDomainId AS subDomainId, sd.name AS subDomainName,
+           sd.clauseCount AS clauseCount,
+           sd.regulationCount AS regulationCount,
+           sd.densityScore AS densityScore,
+           sd.avgNormativeIntensity AS avgNI,
+           sd.weightedDensity AS weightedDensity,
+           sd.coveringRegulations AS coveringRegulations,
+           sd.effectiveCoverage AS effectiveCoverage,
+           sd.effectiveCoverageTier AS effectiveCoverageTier
+    ORDER BY domainId, subDomainId
+    """
+    subdomain_results = exec_cypher(subdomain_cypher)
+
     response = {
         "by_regulation": format_results(reg_results) if not isinstance(reg_results, dict) or 'error' not in reg_results else [],
         "by_domain": format_results(domain_results) if not isinstance(domain_results, dict) or 'error' not in domain_results else [],
+        "by_subdomain": format_results(subdomain_results) if not isinstance(subdomain_results, dict) or 'error' not in subdomain_results else [],
         "summary": format_results(summary_results)[0] if summary_results and not isinstance(summary_results, dict) else {}
     }
     return jsonify(response)
+
+@app.route('/api/heatmap', methods=['GET'])
+def heatmap():
+    """38x5 heatmap matrix: clause counts per SubDomain per Regulation"""
+    cypher = """
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    WITH r.regulationId AS regId, sd.subDomainId AS sdId, sd.name AS sdName,
+         count(c) AS clauseCount,
+         sum(c.normativeIntensity) AS totalNI,
+         avg(c.normativeIntensity) AS avgNI
+    RETURN regId, sdId, sdName, clauseCount, totalNI, avgNI
+    ORDER BY sdId, regId
+    """
+    results = exec_cypher(cypher)
+    if isinstance(results, dict) and 'error' in results:
+        return jsonify(results), 500
+
+    rows = format_results(results)
+
+    matrix = {}
+    for row in rows:
+        sd_id = row['sdId']
+        if sd_id not in matrix:
+            matrix[sd_id] = {
+                'subDomainId': sd_id,
+                'subDomainName': row['sdName'],
+                'regulations': {}
+            }
+        matrix[sd_id]['regulations'][row['regId']] = {
+            'clauseCount': row['clauseCount'],
+            'totalNI': row['totalNI'],
+            'avgNI': round(row['avgNI'], 2)
+        }
+
+    heatmap_list = [matrix[k] for k in sorted(matrix.keys())]
+    return jsonify({
+        "heatmap": heatmap_list,
+        "description": "38 SubDomains × 5 Regulations matrix. Each cell shows clauseCount, totalNI, and avgNI."
+    })
+
+@app.route('/api/hotspots', methods=['GET'])
+def get_hotspots():
+    """SubDomains covered by 3+ regulations — regulatory hotspots"""
+    cypher = """
+    MATCH (sd:SubDomain)
+    WHERE sd.hotspotScore >= 3
+    OPTIONAL MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd)
+    RETURN sd.subDomainId AS subDomainId, sd.name AS name,
+           sd.hotspotScore AS hotspotScore, sd.hotspotTier AS hotspotTier,
+           sd.regulationCount AS regulationCount, sd.coveringRegulations AS coveringRegulations,
+           d.domainId AS domainId, d.name AS domainName
+    ORDER BY sd.hotspotScore DESC, sd.subDomainId
+    """
+    results = exec_cypher(cypher)
+    if isinstance(results, dict) and 'error' in results:
+        return jsonify(results), 500
+    return jsonify(format_results(results))
 
 @app.route('/api/applicability', methods=['GET'])
 def applicability():
     """Show applicable regulations and clause counts"""
     cypher = """
-    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause {applicable: true})
+    MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)
     WITH r.regulationId AS regId, r.name AS name, 
          count(c) AS applicableClauses, collect(c.clauseId) AS clauses
     RETURN regId, name, applicableClauses, clauses
@@ -289,15 +364,16 @@ def overlap():
     RETURN ca.analysisId AS analysisId,
            regs[0] AS regulation1,
            regs[1] AS regulation2,
-           ca.sharedSubDomainCount AS sharedSubDomains,
+           ca.dynamicSharedSubDomainCount AS sharedSubDomains,
            ca.totalUniqueSubDomains AS totalUnique,
-           ca.jaccardIndex AS jaccardIndex,
+           ca.dynamicJaccard AS jaccardIndex,
            ca.complementarityIndex AS complementarityIndex,
            ca.conflictClassification AS conflictType,
            ca.overlapDescription AS overlapDescription,
            ca.conflictDescription AS conflictDescription,
-           ca.recommendedApproach AS recommendedApproach
-    ORDER BY ca.jaccardIndex DESC
+           ca.recommendedApproach AS recommendedApproach,
+           ca.jaccardSource AS jaccardSource
+    ORDER BY jaccardIndex DESC
     """
     results = exec_cypher(cypher)
     if isinstance(results, dict) and 'error' in results:
@@ -306,22 +382,27 @@ def overlap():
 
 @app.route('/api/domains', methods=['GET'])
 def get_domains():
-    """List all domains and their sub-domains"""
+    """List all domains and their sub-domains with density metrics"""
     cypher = """
-    MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)
-    OPTIONAL MATCH (sd)<-[:COVERS_SUBDOMAIN]-(:Clause)
-    RETURN d.domainId AS domainId, d.name AS domainName,
-           d.description AS domainDescription,
+    MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+    RETURN d.domainId AS domainId, d.name AS domainName, d.description AS domainDescription,
            sd.subDomainId AS subDomainId, sd.name AS subDomainName,
            sd.description AS subDomainDescription,
-           CASE WHEN (sd)<-[:COVERS_SUBDOMAIN]-(:Clause) THEN true ELSE false END AS hasCoverage
-    ORDER BY d.domainId, sd.subDomainId
+           sd.clauseCount AS clauseCount,
+           sd.regulationCount AS regulationCount,
+           sd.densityScore AS densityScore,
+           sd.avgNormativeIntensity AS avgNI,
+           sd.weightedDensity AS weightedDensity,
+           sd.coveringRegulations AS coveringRegulations,
+           sd.hotspotScore AS hotspotScore,
+           sd.hotspotTier AS hotspotTier,
+           CASE WHEN sd.clauseCount > 0 THEN true ELSE false END AS hasCoverage
+    ORDER BY domainId, subDomainId
     """
     results = exec_cypher(cypher)
     if isinstance(results, dict) and 'error' in results:
         return jsonify(results), 500
-    
-    # Group by domain
+
     domains = {}
     for row in format_results(results):
         did = row['domainId']
@@ -336,9 +417,17 @@ def get_domains():
             "subDomainId": row['subDomainId'],
             "name": row['subDomainName'],
             "description": row['subDomainDescription'],
-            "hasCoverage": row['hasCoverage']
+            "hasCoverage": row['hasCoverage'],
+            "clauseCount": row.get('clauseCount') or 0,
+            "regulationCount": row.get('regulationCount') or 0,
+            "densityScore": row.get('densityScore') or 0.0,
+            "avgNormativeIntensity": row.get('avgNI') or 0.0,
+            "weightedDensity": row.get('weightedDensity') or 0.0,
+            "coveringRegulations": row.get('coveringRegulations') or [],
+            "hotspotScore": row.get('hotspotScore') or 0,
+            "hotspotTier": row.get('hotspotTier') or 'LOW'
         })
-    
+
     return jsonify(list(domains.values()))
 
 
@@ -369,11 +458,11 @@ def get_regulatory_interactions():
     RETURN ca.analysisId AS id,
            regs[0] AS reg1,
            regs[1] AS reg2,
-           ca.sharedSubDomainCount AS sharedSD,
-           ca.jaccardIndex AS jaccard,
+           ca.dynamicSharedSubDomainCount AS sharedSD,
+           ca.dynamicJaccard AS jaccard,
            ca.conflictClassification AS conflictType,
            ca.recommendedApproach AS resolution
-    ORDER BY ca.jaccard DESC
+    ORDER BY jaccard DESC
     """
     timeline_cypher = """
     MATCH (r:Regulation)

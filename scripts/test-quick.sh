@@ -7,10 +7,8 @@
 # This script:
 #   1. Verifies system health (Neo4j, Ollama)
 #   2. Runs 5 representative tasks
-#   3. Compares results with baseline_stable_v1.json
+#   3. Compares results with baseline
 #   4. Reports pass/fail with detailed analysis
-#
-# This verifies that the current codebase is stable against the master baseline.
 
 set -e
 
@@ -20,52 +18,66 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Colors for JSON output (if jq available)
-has_jq() {
-    command -v jq &> /dev/null
-}
-
 echo -e "${BLUE}=== AEGIS Quick Test (~5 min) ===${NC}"
 echo ""
 
-# 1. Check dependencies
-echo -e "${BLUE}1. Checking system health...${NC}"
+echo -e "${BLUE}1. Loading environment...${NC}"
 
-# Neo4j
-if curl -s -u neo4j:d3fendtest http://localhost:7474/db/neo4j/tx/commit -H "Content-Type: application/json" -d '{"statements":[{"statement":"RETURN 1"}]' > /dev/null 2>&1; then
+if [ -f ".env" ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+export NEO4J_URI="${NEO4J_URI:-http://localhost:7474}"
+export NEO4J_USER="${NEO4J_USER:-neo4j}"
+export NEO4J_PASSWORD="${NEO4J_PASSWORD}"
+export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
+export OLLAMA_MODEL="${OLLAMA_MODEL:-ministral-3:latest}"
+export LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY}"
+export LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY}"
+export LANGFUSE_BASE_URL="${LANGFUSE_BASE_URL:-http://localhost:3000}"
+export MINIMAX_API_KEY="${MINIMAX_API_KEY}"
+
+if [ -z "$NEO4J_PASSWORD" ]; then
+    echo -e "${RED}✗ NEO4J_PASSWORD not set. Check .env file or environment.${NC}"
+    exit 1
+fi
+
+if [ -z "$MINIMAX_API_KEY" ]; then
+    echo -e "${RED}✗ MINIMAX_API_KEY not set. Check .env file or environment.${NC}"
+    exit 1
+fi
+
+echo -e "   ${GREEN}✓${NC} Environment loaded"
+
+echo ""
+echo -e "${BLUE}2. Checking system health...${NC}"
+
+if curl -s -u neo4j:${NEO4J_PASSWORD} "${NEO4J_URI}/db/neo4j/tx/commit" -H "Content-Type: application/json" -d '{"statements":[{"statement":"RETURN 1"}]' > /dev/null 2>&1; then
     echo -e "   ${GREEN}✓${NC} Neo4j"
 else
     echo -e "   ${RED}✗${NC} Neo4j not accessible"
     exit 1
 fi
 
-# Ollama
-if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+if curl -s "${OLLAMA_BASE_URL}/api/tags" > /dev/null 2>&1; then
     echo -e "   ${GREEN}✓${NC} Ollama"
 else
     echo -e "   ${RED}✗${NC} Ollama not accessible"
     exit 1
 fi
 
-# 2. Run eval
 echo ""
-echo -e "${BLUE}2. Running evaluation (5 tasks, ~5 min)...${NC}"
+echo -e "${BLUE}3. Running evaluation (5 tasks)...${NC}"
+
+if [ ! -f "/home/epmq/Desktop/Projects/shared-venv/bin/activate" ]; then
+    echo -e "${RED}✗ Virtual environment not found${NC}"
+    exit 1
+fi
 
 source /home/epmq/Desktop/Projects/shared-venv/bin/activate > /dev/null 2>&1
 
-export NEO4J_URI=http://localhost:7474
-export NEO4J_USER=neo4j
-export NEO4J_PASSWORD=d3fendtest
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=ministral-3:latest
-export LANGFUSE_PUBLIC_KEY=pk-lf-ea927dac-58fd-48f5-b98e-1eaf0aeab892
-export LANGFUSE_SECRET_KEY=sk-lf-5b2e0db7-d911-444f-9971-3f5699147ac7
-export LANGFUSE_BASE_URL=http://localhost:3000
-export MINIMAX_API_KEY=sk-cp-yta9jJd1FoaX91wTwoVjoICfZm-wjFqKLccscXuVCdHp8huqOLAY_T6yScB3eO35cfxqBzXvlMYXfxQcPCOlDeBhkyTrMxGGwgv6UdICKK93Xi-_6dHubz4
-
 cd /home/epmq/Desktop/Projects/aegis-kg-unified
 
-# Create temp task list with 5 representative tasks
 TEMP_TASKS=$(mktemp)
 cat > "$TEMP_TASKS" << 'EOF'
 tasks:
@@ -87,12 +99,10 @@ tasks:
 EOF
 
 PYTHONPATH=. python3 aegis_eval/run_eval.py --tasks "$TEMP_TASKS" --trials 1 2>&1 | tee /tmp/test-quick-output.log
-
 rm -f "$TEMP_TASKS"
 
-# 3. Extract results
 echo ""
-echo -e "${BLUE}3. Analyzing results...${NC}"
+echo -e "${BLUE}4. Analyzing results...${NC}"
 
 RESULT_FILE=$(ls -t aegis_eval/results/summary_*.json 2>/dev/null | head -1)
 
@@ -101,13 +111,20 @@ if [ -z "$RESULT_FILE" ] || [ ! -f "$RESULT_FILE" ]; then
     exit 1
 fi
 
-# Compare with baseline
-python3 << EOF
+python3 << 'PYEOF'
 import json
 import sys
+import os
+
+os.chdir("/home/epmq/Desktop/Projects/aegis-kg-unified")
 
 baseline_file = "aegis_eval/results/baseline_stable_v1.json"
-current_file = "$RESULT_FILE"
+current_file = sys.argv[1] if len(sys.argv) > 1 else None
+
+if not current_file:
+    import glob
+    files = sorted(glob.glob("aegis_eval/results/summary_*.json"), reverse=True)
+    current_file = files[0] if files else None
 
 try:
     baseline = json.load(open(baseline_file))
@@ -125,10 +142,10 @@ print(f"Current pass rate:   {current_pr:.1f}%")
 
 threshold = 85.0
 if current_pr >= threshold:
-    print(f"\n{GREEN}✓ PASS: {current_pr:.1f}% >= {threshold}% threshold{NC}")
+    print(f"\nPASS: {current_pr:.1f}% >= {threshold}% threshold")
     sys.exit(0)
 else:
-    print(f"\n{RED}✗ FAIL: {current_pr:.1f}% < {threshold}% threshold{NC}")
+    print(f"\nFAIL: {current_pr:.1f}% < {threshold}% threshold")
     print("")
     print("Dimension comparison:")
     for dim in baseline.get("by_dimension", {}):
@@ -136,30 +153,22 @@ else:
         c_avg = current.get("by_dimension", {}).get(dim, {}).get("overall_avg", 0)
         diff = c_avg - b_avg
         if diff < -0.5:
-            status = "❌"
+            status = "REGRESSION"
         elif diff < 0:
-            status = "⚠️ "
+            status = "degraded"
         else:
-            status = "✅"
-        print(f"  {status} {dim}: {b_avg:.2f} → {c_avg:.2f} ({diff:+.2f})")
+            status = "OK"
+        print(f"  {status} {dim}: {b_avg:.2f} -> {c_avg:.2f} ({diff:+.2f})")
     sys.exit(1)
-EOF
+PYEOF
 
 TEST_RESULT=$?
 
-# Summary
 echo ""
 if [ $TEST_RESULT -eq 0 ]; then
     echo -e "${GREEN}=== TEST PASSED ===${NC}"
-    echo "System is stable. You can proceed with your changes or create a Pull Request."
 else
     echo -e "${RED}=== TEST FAILED ===${NC}"
-    echo "There may be a regression. Review the analysis above."
-    echo ""
-    echo "If you just made changes:"
-    echo "  1. Review what you changed"
-    echo "  2. If unrelated to your changes, it may be infrastructure"
-    echo "  3. If caused by your changes, revert or fix"
 fi
 
 exit $TEST_RESULT

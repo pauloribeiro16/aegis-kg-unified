@@ -24,34 +24,80 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 
 ### SIDE A — AEGIS REGULATORY (EU Regulations)
 
-1. Regulation(regulationId, label, description, euReference, clauseCount, applicabilityConditionCount)
+1. Regulation(regulationId, label, description, euReference, clauseCount, applicabilityConditionCount, complianceDeadline, enforcementDate, applicationDate, urgencyTier, daysToCompliance, daysToEnforcement, obligationProfile, dominantObligationType, continuousObligationRatio, urgencyIndex)
    - 5 nodes: GDPR, CRA, NIS2, DORA, AIAct
-   - KNOWN ISSUE: name, fullName, effectiveDate, lastAmended, notificationTimelines are NULL
+   - KNOWN ISSUE: name, fullName, lastAmended, notificationTimelines are NULL (effectiveDate IS populated)
+   - Temporal applicability:     - complianceDeadline: date — deadline for organizations to comply
+     - enforcementDate: date — date penalties/sanctions begin
+     - applicationDate: date — date the regulation starts applying to organizations
+     - urgencyTier: string — 'PAST_DUE', 'CRITICAL' (<=90 days), 'URGENT' (<=365 days), 'ON_TRACK' (>365 days)
+     - daysToCompliance: integer — days until compliance deadline (negative = past due)
+     - daysToEnforcement: integer — days until enforcement date (negative = enforcement active)
+   - Obligation type analysis:     - obligationProfile: JSON string — e.g. '{"CONTINUOUS":18,"ONE_TIME":1,"PERIODIC":6,"TRIGGERED":4}'
+     - dominantObligationType: most frequent obligation type
+     - continuousObligationRatio: CONTINUOUS clauses / total clauses
+     - urgencyIndex: float [0..1] — weighted composite: (continuous*1.0 + triggered*0.7 + periodic*0.5 + oneTime*0.3) / total
 
-2. Article(articleId, number, title)
+ 2. RegulatoryTimeline(timelineId, eventType, eventDate, description, regulationId)
+   - Key milestone events per regulation (e.g., ENTRY_INTO_FORCE, APPLICATION, ENFORCEMENT)
+   - Relationship: (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
+
+ 3. RegulatoryAuthority(authorityId, authorityName, authorityType, soleAuthorityCount, totalEffectiveCoverage, avgObligationUrgency, avgContinuousRatio, authorityInfluenceScore, primaryRegulationId)
+   - 5 nodes: ENISA, DPAs, NCAs_ENISA, EU_AI_OFFICE, ESAs
+   - authorityType: EU_AGENCY | NATIONAL_DPA | NATIONAL_COORDINATION | EU_OFFICE | ESA_BODY
+   - authorityInfluenceScore: composite = soleAuthorityCount*5 + totalEC*0.3 + avgUrgency*count*2 + totalHotspotScore*1
+   - Relationship: (SubDomain)-[:UNDER_REGULATORY_AUTHORITY]->(RegulatoryAuthority)
+
+ 4. Article(articleId, number, title)
    - 47 nodes total
    - KNOWN ISSUE: regulationId is NULL on all articles; chapter, section, obligationType are empty
 
-3. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
+ 5. Clause(clauseId, regulationId, normativeIntensity, obligationType, obligatedParty, articleReference, description)
    - 150 nodes total
    - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
    - KNOWN ISSUE: applicable is NULL on all clauses; sourceReference and crossReferences are empty
 
-4. Domain(domainId, name)
+ 6. Domain(domainId, name)
    - 10 nodes: D-01 through D-10
 
-5. SubDomain(subDomainId, name, soleAuthority, gapRisk)
+ 7. SubDomain(subDomainId, name, soleAuthority, authorityId, gapRisk, clauseCount, regulationCount, densityScore, avgNormativeIntensity, weightedDensity, coveringRegulations, effectiveCoverage, effectiveCoverageTier, hotspotScore, hotspotTier, gapDensityScore, gapDensityTier, clauseDistribution, missingRegulations, dominantObligationType, continuousObligationRatio, obligationUrgencyIndex)
    - 38 nodes: D-01.1 through D-10.3
    - Format: D-XX.Y (DOT separator, e.g., D-01.1, D-02.3, D-10.2)
-   - KNOWN ISSUE: keywords and examples are empty on all nodes
+   - Computed from graph:     - clauseCount: integer — count of clauses mapped via MAPPED_TO
+     - regulationCount: integer — count of distinct regulations covering this subdomain
+     - densityScore: float — clauseCount / 5.0 (normalized by max 5 regulations)
+     - avgNormativeIntensity: float — average NI of covering clauses (range 0-3.0)
+     - weightedDensity: float — sum(NI) / 15.0 (NI-weighted, max 1.0)
+     - coveringRegulations: list[string] — regulation IDs covering this subdomain
+   - NI-weighted coverage:
+     - effectiveCoverage: float — sum of NI values of all clauses mapped to this SubDomain (higher = stronger regulatory pressure)
+     - effectiveCoverageTier: string — 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0)
+   - Multi-regulation hotspots:
+     - hotspotScore: integer — number of regulations covering this SubDomain (same as regulationCount)
+     - hotspotTier: string — 'CRITICAL' (>=5 regs), 'HIGH' (>=4), 'MODERATE' (>=3), 'LOW' (<3)
+   - Gap density:
+     - gapDensityScore: float [0..1] — balance of clause distribution across regulations (1=perfectly balanced, 0=highly unbalanced); based on coefficient of variation
+     - gapDensityTier: string — 'DENSE' (>=0.5), 'MODERATE' (>=0.2), 'SPARSE' (<0.2)
+     - clauseDistribution: JSON string — e.g. '{"GDPR":2,"CRA":1,"NIS2":1,"DORA":1,"AIAct":0}'
+     - missingRegulations: list[string] — regulation IDs NOT covering this SubDomain (gaps)
+   - Obligation type analysis:
+     - dominantObligationType: most frequent obligation type of clauses mapped to this SubDomain
+     - continuousObligationRatio: CONTINUOUS clauses / total mapped clauses
+     - obligationUrgencyIndex: float [0..1] — same formula as Regulation.urgencyIndex applied to SubDomain clauses
+   - Authority concentration:
+     - authorityId: string — ID of the sole regulatory authority (e.g., 'ENISA', 'DPAs', 'EU_AI_OFFICE')
 
-6. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification)
-   - 6 nodes with real Jaccard indices (NIS2-DORA=0.857, CRA-DORA=0.562, etc.)
+ 8. ComplementarityAnalysis(analysisId, regulation1Id, regulation2Id, jaccardIndex, conflictClassification, dynamicJaccard, dynamicSharedSubDomainCount, jaccardSource)
+   - 10 nodes: all regulation pairs (5 choose 2)
+     - dynamicJaccard: float — recomputed from clause mappings (may differ from jaccardIndex)
+     - dynamicSharedSubDomainCount: integer — actual shared SubDomain count
+     - jaccardSource: 'DYNAMIC' — indicates computed from graph
+     - jaccardIndex: original static value (kept for reference)
 
-7. StrategicTension(tensionId, description, severity)
+ 9. StrategicTension(tensionId, description, severity)
    - 4 nodes with real regulatory conflicts (GDPR vs CRA, GDPR vs NIS2, DPIA vs AI Act, NIS2 vs DORA alignment)
 
-8. ApplicabilityCondition(conditionId, description)
+10. ApplicabilityCondition(conditionId, description)
    - 12 nodes with per-regulation applicability rules
    - KNOWN ISSUE: conditionType is NULL
 
@@ -63,10 +109,12 @@ The KG has two distinct but connected sides, bridged by SubDomain nodes:
 2. FrameworkCategory(categoryId, name, type, functionCode)
    - 40 nodes total
    - type: 'FUNCTION' (6: GV, ID, PR, DE, RS, RC) or 'CATEGORY' (34 subcategories)
-   - functionCode: for CATEGORY nodes, points to parent Function
+   - functionCode: for CATEGORY nodes, points to parent Function (e.g., PR.DS has functionCode='PR')
 
-3. FrameworkControl(controlId, title, categoryId, functionCode)
+3. FrameworkControl(controlId, title, categoryId, functionCode, frameworkId)
    - 106 nodes: e.g., GV.OC-01, PR.DS-01, DE.CM-01
+   - CRITICAL: Use properties functionCode and categoryId to filter, NOT node relationships
+   - frameworkId='NIST_CSF_2_0' on all controls
 
 ### RELATIONSHIPS (Verified — Actual Names)
 
@@ -74,26 +122,33 @@ Regulatory side:
 - (Regulation)-[:HAS_ARTICLE]->(Article)
 - (Regulation)-[:HAS_CLAUSE]->(Clause)
 - (Article)-[:DEFINES]->(Clause)
-- (Domain)-[:CONTAINS]->(SubDomain)          [NOT HAS_SUBDOMAIN]
+- (Domain)-[:HAS_SUBDOMAIN]->(SubDomain)        [NOT CONTAINS]
 - (Clause)-[:MAPPED_TO]->(SubDomain)          [NOT COVERS_SUBDOMAIN]
 - (Regulation)-[:HAS_TENSION_WITH]->(Regulation)
 - (StrategicTension)-[:AFFECTS_SUBDOMAIN]->(SubDomain)
 - (StrategicTension)-[:INVOLVES_REGULATION]->(Regulation)
 - (StrategicTension)-[:INVOLVES_CLAUSE]->(Clause)
 - (Regulation)-[:HAS_APPLICABILITY]->(ApplicabilityCondition)
+- (Regulation)-[:HAS_TIMELINE_EVENT]->(RegulatoryTimeline)
+- (SubDomain)-[:UNDER_REGULATORY_AUTHORITY]->(RegulatoryAuthority)
 - (SubDomain)-[:HAS_METRICS]->(SubDomainMetrics)
 
 NIST CSF side:
 - (Framework)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function nodes]
 - (FrameworkCategory)-[:HAS_CATEGORY]->(FrameworkCategory)  [Function→Category hierarchy]
-- (FrameworkCategory)-[:HAS_CONTROL]->(FrameworkControl)
+- (FrameworkControl)-[:HAS_CONTROL]->(FrameworkCategory)  [NOTE: direction is CONTROL→CATEGORY, rare to traverse]
 - (FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(SubDomain)
 - (FrameworkControl)-[:MAPS_TO_DOMAIN]->(Domain)
 
-Complementarity side:
-- (ComplementarityAnalysis)-[:OVERLAPS_WITH]->(Regulation)
+### NIST CSF CRITICAL USAGE RULES
 
-## IDENTITY CONVENTIONS (Verified — Actual Format)
+FrameworkControl filtering is DONE VIA PROPERTIES, not relationships:
+- To filter by function: MATCH (fc:FrameworkControl {functionCode: 'PR'})
+- To filter by category: MATCH (fc:FrameworkControl {categoryId: 'PR.DS'})
+- To list functions: MATCH (fc:FrameworkCategory {type: 'FUNCTION'})
+- DO NOT use: MATCH (fc:FrameworkCategory)-[:HAS_CONTROL]->(fc:FrameworkControl)  [WRONG]
+
+### IDENTITY CONVENTIONS (Verified — Actual Format)
 
 - SubDomain: "D-XX.Y" (DOT separator) — e.g., "D-01.1", "D-02.3", "D-10.2"
   - WRONG: "D-01-1", "D-02-3" (dash format does not exist in the graph)
@@ -167,6 +222,156 @@ RETURN ca.jaccardIndex, ca.conflictClassification, ca.overlapDescription
 MATCH (sd:SubDomain)
 WHERE sd.soleAuthority IS NOT NULL AND sd.soleAuthority <> ''
 RETURN sd.subDomainId, sd.name, sd.soleAuthority
+
+## NIST CSF WORKING PATTERNS (Verified — These queries work)
+
+### List all NIST functions
+MATCH (fc:FrameworkCategory {type: 'FUNCTION'}) RETURN fc.categoryId AS functionCode, fc.name ORDER BY fc.categoryId
+
+### Count controls by function
+MATCH (fc:FrameworkControl) RETURN fc.functionCode AS function, count(fc) AS controlCount ORDER BY controlCount DESC
+
+### Controls for Protect (PR) function
+MATCH (fc:FrameworkControl {functionCode: 'PR'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+### Controls in PR.DS (Data Security) category
+MATCH (fc:FrameworkControl {categoryId: 'PR.DS'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
+
+### Controls mapping to a specific subdomain
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain {subDomainId: 'D-01.1'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+### NIST controls covering each AEGIS domain
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
+
+### Subdomains covered by NIST controls (with regulatory comparison)
+MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN sd.name AS subdomain, count(DISTINCT c) AS clauseCount, count(DISTINCT fc) AS nistCount ORDER BY clauseCount DESC
+
+### Subdomains with NIST but no regulatory coverage
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd)) RETURN sd.subDomainId, sd.name ORDER BY sd.subDomainId
+
+### Regulation coverage across domains
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain) RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount ORDER BY domain, clauseCount DESC
+
+### SUBDOMAIN DENSITY PATTERNS
+MATCH (sd:SubDomain) WHERE sd.clauseCount > 0 RETURN sd.subDomainId, sd.name, sd.clauseCount, sd.densityScore ORDER BY sd.densityScore DESC LIMIT 10
+
+MATCH (sd:SubDomain) WHERE sd.regulationCount >= 4 RETURN sd.subDomainId, sd.name, sd.regulationCount, sd.coveringRegulations ORDER BY sd.regulationCount DESC
+
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId, d.name, count(sd) AS totalSubdomains, avg(sd.densityScore) AS avgDensity ORDER BY avgDensity DESC
+
+### DYNAMIC JACCARD
+MATCH (ca:ComplementarityAnalysis) WHERE ca.jaccardSource = 'DYNAMIC' RETURN ca.regulation1Id, ca.regulation2Id, ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount AS shared ORDER BY jaccardIndex DESC
+
+### NI-WEIGHTED COVERAGE PATTERNS
+MATCH (sd:SubDomain) WHERE sd.effectiveCoverageTier = 'HIGH' RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier ORDER BY sd.effectiveCoverage DESC LIMIT 10
+
+MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10.0 RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount ORDER BY sd.effectiveCoverage DESC
+
+MATCH (r:Regulation) WHERE r.effectiveCoverageTier IS NOT NULL RETURN r.regulationId, r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC
+
+### HEATMAP PATTERNS
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+RETURN sd.subDomainId, sd.name AS subdomain, r.regulationId AS regulation,
+       count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
+ORDER BY sd.subDomainId, r.regulationId
+
+MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+WITH sd.subDomainId AS sdId, sd.name AS sdName, collect(r.regulationId) AS regs, count(DISTINCT c) AS totalClauses
+RETURN sdId, sdName, regs, totalClauses ORDER BY totalClauses DESC
+
+### HOTSPOT PATTERNS
+MATCH (sd:SubDomain) WHERE sd.hotspotScore >= 3
+RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
+ORDER BY sd.hotspotScore DESC
+
+MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier
+
+MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+RETURN d.name AS domain, sd.hotspotTier AS tier, count(sd) AS count
+ORDER BY domain, tier
+
+### STRATEGIC TENSION PATTERNS
+MATCH (st:StrategicTension)-[:INVOLVES_REGULATION]->(r:Regulation)
+WITH st, collect(r.regulationId) AS regs, st.conflictType AS conflictType, st.severity AS severity
+RETURN st.tensionId AS tensionId, regs, conflictType, severity, st.description AS description
+ORDER BY severity DESC
+
+MATCH (st:StrategicTension)-[:AFFECTS_SUBDOMAIN]->(sd:SubDomain)
+RETURN st.tensionId AS tensionId, st.conflictType AS conflictType, st.severity AS severity,
+       sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.description AS description
+ORDER BY sd.subDomainId
+
+### CONFLICT SEVERITY PATTERNS
+MATCH (ca:ComplementarityAnalysis)
+WHERE ca.conflictSeverityScore IS NOT NULL
+RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
+       ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
+ORDER BY severityScore DESC
+
+### GAP DENSITY PATTERNS
+MATCH (sd:SubDomain)
+WHERE sd.gapDensityScore IS NOT NULL
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.gapDensityTier,
+       sd.clauseDistribution, sd.missingRegulations
+ORDER BY sd.gapDensityScore DESC
+
+MATCH (sd:SubDomain) RETURN sd.gapDensityTier AS tier, count(*) AS count ORDER BY tier
+
+MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'DENSE'
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.clauseDistribution
+ORDER BY sd.gapDensityScore DESC
+
+MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE'
+RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations
+ORDER BY sd.gapDensityScore ASC, sd.regulationCount DESC
+
+### TEMPORAL APPLICABILITY PATTERNS
+MATCH (r:Regulation)
+RETURN r.regulationId, r.name, r.effectiveDate, r.applicationDate,
+       r.complianceDeadline, r.enforcementDate, r.urgencyTier,
+       r.daysToCompliance, r.daysToEnforcement
+ORDER BY r.daysToCompliance ASC
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+RETURN r.regulationId, t.eventType, t.eventDate, t.description
+ORDER BY r.regulationId, t.eventDate
+
+MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline)
+WHERE r.regulationId = 'AIAct'
+RETURN t.eventType, t.eventDate, t.description
+ORDER BY t.eventDate
+
+### OBLIGATION TYPE PATTERNS
+MATCH (r:Regulation)
+RETURN r.regulationId, r.name, r.obligationProfile, r.dominantObligationType,
+       r.continuousObligationRatio, r.urgencyIndex
+ORDER BY r.urgencyIndex DESC
+
+MATCH (sd:SubDomain)
+WHERE sd.dominantObligationType IS NOT NULL
+RETURN sd.subDomainId, sd.name, sd.dominantObligationType, sd.continuousObligationRatio, sd.obligationUrgencyIndex
+ORDER BY sd.obligationUrgencyIndex DESC
+
+MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS'
+RETURN sd.subDomainId, sd.name, sd.obligationUrgencyIndex, sd.continuousObligationRatio
+ORDER BY sd.continuousObligationRatio DESC
+
+### AUTHORITY CONCENTRATION PATTERNS
+MATCH (auth:RegulatoryAuthority)
+RETURN auth.authorityId, auth.authorityName, auth.authorityType,
+       auth.soleAuthorityCount, auth.authorityInfluenceScore
+ORDER BY auth.authorityInfluenceScore DESC
+
+MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain)
+RETURN auth.authorityId, auth.authorityName, count(sd) AS subdomainCount,
+       auth.authorityInfluenceScore
+ORDER BY auth.authorityInfluenceScore DESC
+
+MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain)
+WHERE auth.authorityId = 'ENISA'
+RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.obligationUrgencyIndex
+ORDER BY sd.effectiveCoverage DESC
+
 """
 
 EXAMPLES = [
@@ -188,7 +393,7 @@ EXAMPLES = [
     },
     {
         "question": "How many NIST controls map to each AEGIS domain?",
-        "cypher": "MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistControlCount ORDER BY nistControlCount DESC"
+        "cypher": "MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl) RETURN d.name AS domain, count(DISTINCT fc) AS nistControlCount ORDER BY nistControlCount DESC"
     },
     {
         "question": "What are the strategic tensions between GDPR and CRA?",

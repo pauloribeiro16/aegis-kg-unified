@@ -1,6 +1,18 @@
 """Configuration for AEGIS Agents."""
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+env_path = Path(__file__).parent.parent / ".env"
+load_result = load_dotenv(env_path)
+
+print(f"[DEBUG config] load_dotenv({env_path}) returned: {load_result}", flush=True)
+print(f"[DEBUG config] NEO4J_PASSWORD set: {bool(os.getenv('NEO4J_PASSWORD'))}", flush=True)
+print(f"[DEBUG config] MINIMAX_API_KEY set: {bool(os.getenv('MINIMAX_API_KEY'))}", flush=True)
+print(f"[DEBUG config] MINIMAX_API_KEY len: {len(os.getenv('MINIMAX_API_KEY', ''))}", flush=True)
+print(f"[DEBUG config] LANGFUSE_PUBLIC_KEY set: {bool(os.getenv('LANGFUSE_PUBLIC_KEY'))}", flush=True)
+print(f"[DEBUG config] OLLAMA_BASE_URL: {os.getenv('OLLAMA_BASE_URL')}", flush=True)
 
 NEO4J_CONFIG = {
     "http_url": os.getenv("NEO4J_URI", "http://localhost:7474"),
@@ -8,6 +20,7 @@ NEO4J_CONFIG = {
     "password": os.getenv("NEO4J_PASSWORD", ""),
     "database": "neo4j",
 }
+print(f"[DEBUG config] NEO4J_CONFIG password length: {len(NEO4J_CONFIG['password'])}", flush=True)
 
 OLLAMA_CONFIG = {
     "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),

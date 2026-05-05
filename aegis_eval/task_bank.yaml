@@ -142,8 +142,8 @@ tasks:
 - id: map_to_subdomain_details
   category: subdomain_mapping
   difficulty: medium
-  question: Show all clauses mapped to subdomain D-01-1 (Data at Rest Encryption)
-  expected_cypher: 'MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain {subDomainId: ''D-01-1''})
+  question: Show all clauses mapped to subdomain D-01.1 (Data at Rest Encryption)
+  expected_cypher: 'MATCH (c:Clause)-[:MAPPED_TO]->(sd:SubDomain {subDomainId: ''D-01.1''})
     RETURN c.clauseId, c.regulationId, c.description ORDER BY c.regulationId'
   expected_result:
     row_count: null
@@ -245,7 +245,7 @@ tasks:
   category: normative_intensity
   difficulty: hard
   question: What is the average normative intensity of clauses per security domain?
-  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+  expected_cypher: MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
     RETURN d.name AS domain, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
   expected_result:
     row_count: null
@@ -346,7 +346,7 @@ tasks:
   category: complex_reasoning
   difficulty: hard
   question: Show which regulations provide the most coverage across security domains
-  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:HAS_SUBDOMAIN]-(d:Domain)
+  expected_cypher: MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)<-[:CONTAINS]-(d:Domain)
     RETURN d.name AS domain, r.regulationId AS regulation, count(DISTINCT c) AS clauseCount
     ORDER BY domain, clauseCount DESC
   expected_result:
@@ -370,13 +370,11 @@ tasks:
   category: clause_lookup
   difficulty: medium
   question: Which article has the most clauses defined across all regulations?
-  expected_cypher: 'MATCH (c:Clause) RETURN c.articleReference AS article, c.regulationId AS regulation,
-    count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 5'
+  expected_cypher: 'MATCH (c:Clause) WHERE c.articleReference IS NOT NULL RETURN c.articleReference AS article, count(c) AS clauseCount ORDER BY clauseCount DESC LIMIT 5'
   expected_result:
     row_count: 5
     columns:
     - article
-    - regulation
     - clauseCount
 - id: articles_without_clauses
   category: gap_analysis
@@ -437,9 +435,9 @@ tasks:
 - id: nist_cover_subdomain
   category: unified_mapping
   difficulty: medium
-  question: Show all NIST controls that map to subdomain D-01-1
+  question: Show all NIST controls that map to subdomain D-01.1
   expected_cypher: 'MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain
-    {subDomainId: ''D-01-1''}) RETURN fc.controlId, fc.title, fc.categoryId ORDER
+    {subDomainId: ''D-01.1''}) RETURN fc.controlId, fc.title, fc.categoryId ORDER
     BY fc.controlId'
   expected_result:
     row_count: null
@@ -488,7 +486,7 @@ tasks:
   category: unified_mapping
   difficulty: hard
   question: How many NIST controls cover each AEGIS domain?
-  expected_cypher: MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
+  expected_cypher: MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPS_TO_SUBDOMAIN]-(fc:FrameworkControl)
     RETURN d.name AS domain, count(DISTINCT fc) AS nistCount ORDER BY nistCount DESC
   expected_result:
     row_count: null
@@ -530,3 +528,504 @@ tasks:
     columns:
     - fc.controlId
     - fc.description
+- id: subdomain_density_ranking
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have the highest clause density?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.clauseCount > 0 RETURN sd.subDomainId,
+    sd.name, sd.clauseCount, sd.densityScore ORDER BY sd.densityScore DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.clauseCount
+    - sd.densityScore
+- id: multi_regulation_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are covered by 4 or more regulations?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.regulationCount >= 4 RETURN sd.subDomainId,
+    sd.name, sd.regulationCount, sd.coveringRegulations ORDER BY sd.regulationCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.regulationCount
+    - sd.coveringRegulations
+- id: regulation_density_comparison
+  category: coverage
+  difficulty: hard
+  question: What is the average subdomain density for each regulation?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, count(DISTINCT sd) AS coveredSubdomains,
+    avg(sd.densityScore) AS avgDensity ORDER BY avgDensity DESC'
+  expected_result:
+    row_count: 5
+    columns:
+    - regulation
+    - coveredSubdomains
+    - avgDensity
+- id: dynamic_jaccard_nis2_dora
+  category: complementarity
+  difficulty: hard
+  question: What is the dynamically computed Jaccard index between NIS2 and DORA?
+  expected_cypher: 'MATCH (ca:ComplementarityAnalysis) WHERE (ca.regulation1Id = ''NIS2''
+    AND ca.regulation2Id = ''DORA'') OR (ca.regulation1Id = ''DORA'' AND ca.regulation2Id
+    = ''NIS2'') RETURN ca.dynamicJaccard AS jaccardIndex, ca.dynamicSharedSubDomainCount
+    AS sharedSubDomains, ca.jaccardSource AS source'
+  expected_result:
+    row_count: 1
+    columns:
+    - jaccardIndex
+    - sharedSubDomains
+    - source
+- id: normative_intensity_density
+  category: coverage
+  difficulty: hard
+  question: Which subdomains have the highest average normative intensity?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.avgNormativeIntensity > 0 RETURN sd.subDomainId,
+    sd.name, sd.avgNormativeIntensity, sd.clauseCount ORDER BY sd.avgNormativeIntensity DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.avgNormativeIntensity
+    - sd.clauseCount
+- id: sparse_coverage_subdomains
+  category: gap_analysis
+  difficulty: medium
+  question: Which subdomains have only one covering regulation?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.regulationCount = 1 RETURN sd.subDomainId,
+    sd.name, sd.coveringRegulations, sd.gapRisk ORDER BY sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.coveringRegulations
+    - sd.gapRisk
+- id: density_by_domain
+  category: coverage
+  difficulty: hard
+  question: What is the average subdomain density per security domain?
+  expected_cypher: 'MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain) RETURN d.domainId,
+    d.name, count(sd) AS totalSubdomains, avg(sd.densityScore) AS avgDensity, sum(CASE
+    WHEN sd.clauseCount > 0 THEN 1 ELSE 0 END) AS coveredSubdomains ORDER BY avgDensity DESC'
+  expected_result:
+    row_count: 10
+    columns:
+    - domainId
+    - name
+    - totalSubdomains
+    - avgDensity
+    - coveredSubdomains
+- id: effective_coverage_top_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have the highest effective coverage (sum of normative intensities)?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverage IS NOT NULL RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount ORDER BY
+    sd.effectiveCoverage DESC LIMIT 10'
+  expected_result:
+    row_count: 10
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.effectiveCoverageTier
+    - sd.clauseCount
+- id: effective_coverage_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each effective coverage tier?
+  expected_cypher: 'MATCH (sd:SubDomain) RETURN sd.effectiveCoverageTier AS tier, count(*) AS count
+    ORDER BY tier'
+  expected_result:
+    row_count: 3
+    columns:
+    - tier
+    - count
+- id: regulation_effective_coverage_ranking
+  category: coverage
+  difficulty: medium
+  question: Which regulations have the highest effective coverage score?
+  expected_cypher: 'MATCH (r:Regulation) WHERE r.effectiveCoverageScore IS NOT NULL RETURN r.regulationId,
+    r.name, r.effectiveCoverageScore, r.effectiveCoverageTier ORDER BY r.effectiveCoverageScore DESC'
+  expected_result:
+    row_count: 5
+    columns:
+    - r.regulationId
+    - r.name
+    - r.effectiveCoverageScore
+    - r.effectiveCoverageTier
+- id: low_effective_coverage_subdomains
+  category: coverage
+  difficulty: easy
+  question: Which subdomains have LOW effective coverage tier?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverageTier = ''LOW'' RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.clauseCount, sd.coveringRegulations ORDER BY sd.effectiveCoverage'
+  expected_result:
+    row_count: 7
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.clauseCount
+    - sd.coveringRegulations
+- id: high_effective_coverage_detail
+  category: coverage
+  difficulty: medium
+  question: Which subdomains have effective coverage of 10 or higher?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.effectiveCoverage >= 10 RETURN sd.subDomainId,
+    sd.name, sd.effectiveCoverage, sd.effectiveCoverageTier, sd.clauseCount, sd.avgNormativeIntensity,
+    sd.coveringRegulations ORDER BY sd.effectiveCoverage DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.effectiveCoverage
+    - sd.effectiveCoverageTier
+    - sd.clauseCount
+    - sd.avgNormativeIntensity
+    - sd.coveringRegulations
+- id: heatmap_regulation_subdomain
+  category: coverage
+  difficulty: medium
+  question: Show the clause count, total normative intensity, and average NI for each subdomain-regulation pair
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, sd.subDomainId AS subdomain, sd.name AS subdomainName,
+    count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI, avg(c.normativeIntensity) AS avgNI
+    ORDER BY subdomain, regulation'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - subdomain
+    - subdomainName
+    - clauseCount
+    - totalNI
+    - avgNI
+- id: heatmap_subdomain_regulation_coverage
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are covered by each regulation and how many total clauses does each regulation contribute?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN r.regulationId AS regulation, sd.subDomainId AS subdomain,
+    count(c) AS totalClausesPerRegPerSd, sum(c.normativeIntensity) AS totalNI
+    ORDER BY regulation, subdomain'
+  expected_result:
+    row_count: null
+    columns:
+    - regulation
+    - subdomain
+    - totalClausesPerRegPerSd
+    - totalNI
+- id: heatmap_regulation_with_most_clauses_per_subdomain
+  category: coverage
+  difficulty: medium
+  question: Which regulation has the most clauses per subdomain, showing clause count and NI for each?
+  expected_cypher: 'MATCH (r:Regulation)-[:HAS_CLAUSE]->(c:Clause)-[:MAPPED_TO]->(sd:SubDomain)
+    RETURN sd.subDomainId AS subdomain, sd.name AS subdomainName,
+    r.regulationId AS regulation, count(c) AS clauseCount, sum(c.normativeIntensity) AS totalNI
+    ORDER BY subdomain, clauseCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - subdomain
+    - subdomainName
+    - regulation
+    - clauseCount
+    - totalNI
+- id: hotspots_list
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are regulatory hotspots (covered by 3 or more regulations)?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.hotspotScore >= 3 RETURN sd.subDomainId, sd.name,
+    sd.hotspotScore, sd.hotspotTier, sd.regulationCount, sd.coveringRegulations
+    ORDER BY sd.hotspotScore DESC, sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.hotspotScore
+    - sd.hotspotTier
+    - sd.regulationCount
+    - sd.coveringRegulations
+- id: hotspot_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each hotspot tier?
+  expected_cypher: 'MATCH (sd:SubDomain) RETURN sd.hotspotTier AS tier, count(*) AS count ORDER BY tier'
+  expected_result:
+    row_count: null
+    columns:
+    - tier
+    - count
+- id: hotspots_by_domain
+  category: coverage
+  difficulty: medium
+  question: Which security domain has the most hotspot subdomains?
+  expected_cypher: 'MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)
+    WHERE sd.hotspotScore >= 3
+    RETURN d.domainId AS domainId, d.name AS domainName,
+    count(sd) AS hotspotCount, collect(sd.hotspotTier) AS tiers
+    ORDER BY hotspotCount DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - domainId
+    - domainName
+    - hotspotCount
+    - tiers
+- id: critical_hotspots_detail
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are CRITICAL hotspots and what regulations cover them?
+  expected_cypher: 'MATCH (sd:SubDomain) WHERE sd.hotspotTier = ''CRITICAL''
+    RETURN sd.subDomainId, sd.name, sd.hotspotScore, sd.coveringRegulations
+    ORDER BY sd.subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - sd.subDomainId
+    - sd.name
+    - sd.hotspotScore
+    - sd.coveringRegulations
+- id: strategic_tensions_list
+  category: coverage
+  difficulty: medium
+  question: List all strategic tensions between regulations
+  expected_cypher: 'MATCH (st:StrategicTension)-[:INVOLVES_REGULATION]->(r:Regulation)
+    WITH st, collect(r.regulationId) AS regs, st.conflictType AS conflictType, st.severity AS severity
+    RETURN st.tensionId AS tensionId, regs, conflictType, severity, st.description AS description
+    ORDER BY severity DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - tensionId
+    - regs
+    - conflictType
+    - severity
+    - description
+- id: tensions_by_subdomain
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are affected by strategic tensions?
+  expected_cypher: 'MATCH (st:StrategicTension)-[:AFFECTS_SUBDOMAIN]->(sd:SubDomain)
+    RETURN sd.subDomainId AS subDomainId, sd.name AS subDomainName, st.tensionId AS tensionId,
+    st.conflictType AS conflictType, st.severity AS severity
+    ORDER BY subDomainId'
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - subDomainName
+    - tensionId
+    - conflictType
+    - severity
+- id: critical_tensions_detail
+  category: coverage
+  difficulty: easy
+  question: Which strategic tensions are CRITICAL severity?
+  expected_cypher: 'MATCH (st:StrategicTension)
+    WHERE st.severity = ''CRITICAL''
+    RETURN st.tensionId AS tensionId, st.conflictType AS conflictType,
+    st.description AS description, st.severity AS severity
+    ORDER BY tensionId'
+  expected_result:
+    row_count: null
+    columns:
+    - tensionId
+    - conflictType
+    - description
+    - severity
+- id: conflict_severity_ranking
+  category: coverage
+  difficulty: medium
+  question: Which regulation pairs have the highest conflict severity score?
+  expected_cypher: 'MATCH (ca:ComplementarityAnalysis)
+    WHERE ca.conflictSeverityScore IS NOT NULL
+    RETURN ca.analysisId AS analysisId, ca.regulation1Id AS reg1, ca.regulation2Id AS reg2,
+    ca.conflictSeverityScore AS severityScore, ca.severityComponents AS components
+    ORDER BY severityScore DESC'
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - reg1
+    - reg2
+    - severityScore
+    - components
+- id: top_conflict_pairs
+  category: coverage
+  difficulty: easy
+  question: What is the severity score between GDPR and DORA?
+  expected_cypher: "MATCH (ca:ComplementarityAnalysis) WHERE ca.regulation1Id IN ['GDPR','DORA'] AND ca.regulation2Id IN ['GDPR','DORA'] RETURN ca.analysisId, ca.regulation1Id, ca.regulation2Id, ca.conflictSeverityScore AS score ORDER BY score DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - regulation1Id
+    - regulation2Id
+    - score
+- id: severity_by_jaccard
+  category: coverage
+  difficulty: medium
+  question: What is the severity score for the NIS2-DORA pair?
+  expected_cypher: "MATCH (ca:ComplementarityAnalysis) WHERE ca.analysisId = 'NIS2-DORA-001' RETURN ca.analysisId, ca.conflictSeverityScore AS score ORDER BY score DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - analysisId
+    - score
+- id: gap_density_ranking
+  category: coverage
+  difficulty: easy
+  question: Which 5 subdomains have the most balanced clause distribution across regulations?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.gapDensityScore IS NOT NULL RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.gapDensityTier ORDER BY sd.gapDensityScore DESC LIMIT 5"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - gapDensityScore
+    - gapDensityTier
+- id: gap_density_tier_distribution
+  category: coverage
+  difficulty: easy
+  question: How many subdomains are in each gap density tier?
+  expected_cypher: "MATCH (sd:SubDomain) RETURN sd.gapDensityTier AS tier, count(sd) AS count ORDER BY tier"
+  expected_result:
+    row_count: null
+    columns:
+    - tier
+    - count
+- id: gap_density_sparse_analysis
+  category: coverage
+  difficulty: medium
+  question: Which SPARSE subdomains have the most missing regulations?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.gapDensityTier = 'SPARSE' RETURN sd.subDomainId, sd.name, sd.gapDensityScore, sd.missingRegulations, sd.coveringRegulations ORDER BY size(sd.missingRegulations) DESC, sd.gapDensityScore ASC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - gapDensityScore
+    - missingRegulations
+    - coveringRegulations
+- id: urgency_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulation is most urgent to address based on compliance deadline?
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.name, r.complianceDeadline, r.urgencyTier, r.daysToCompliance ORDER BY r.daysToCompliance ASC"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - name
+    - complianceDeadline
+    - urgencyTier
+    - daysToCompliance
+- id: timeline_events
+  category: coverage
+  difficulty: easy
+  question: What are the key timeline events for the AI Act?
+  expected_cypher: "MATCH (r:Regulation)-[:HAS_TIMELINE_EVENT]->(t:RegulatoryTimeline) WHERE r.regulationId = 'AIAct' RETURN t.eventType, t.eventDate, t.description ORDER BY t.eventDate"
+  expected_result:
+    row_count: null
+    columns:
+    - eventType
+    - eventDate
+    - description
+- id: compliance_timeline_overview
+  category: coverage
+  difficulty: easy
+  question: Show all regulations with their effective date, application date, compliance deadline, and enforcement date
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.effectiveDate, r.applicationDate, r.complianceDeadline, r.enforcementDate, r.urgencyTier ORDER BY r.effectiveDate"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - effectiveDate
+    - applicationDate
+    - complianceDeadline
+    - enforcementDate
+    - urgencyTier
+- id: urgency_index_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulation has the highest obligation urgency index?
+  expected_cypher: "MATCH (r:Regulation) RETURN r.regulationId, r.name, r.dominantObligationType, r.continuousObligationRatio, r.urgencyIndex ORDER BY r.urgencyIndex DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - name
+    - dominantObligationType
+    - continuousObligationRatio
+    - urgencyIndex
+- id: obligation_profile_dora
+  category: coverage
+  difficulty: easy
+  question: What is the obligation type profile for DORA?
+  expected_cypher: "MATCH (r:Regulation {regulationId: 'DORA'}) RETURN r.regulationId, r.obligationProfile, r.dominantObligationType, r.continuousObligationRatio, r.urgencyIndex"
+  expected_result:
+    row_count: null
+    columns:
+    - regulationId
+    - obligationProfile
+    - dominantObligationType
+    - continuousObligationRatio
+    - urgencyIndex
+- id: continuous_subdomains
+  category: coverage
+  difficulty: medium
+  question: Which subdomains are dominated by CONTINUOUS obligations and have the highest urgency?
+  expected_cypher: "MATCH (sd:SubDomain) WHERE sd.dominantObligationType = 'CONTINUOUS' RETURN sd.subDomainId, sd.name, sd.continuousObligationRatio, sd.obligationUrgencyIndex ORDER BY sd.obligationUrgencyIndex DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - continuousObligationRatio
+    - obligationUrgencyIndex
+- id: authority_influence_ranking
+  category: coverage
+  difficulty: easy
+  question: Which regulatory authority has the highest influence score based on sole-authority SubDomains?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority) RETURN auth.authorityId, auth.authorityName, auth.authorityType, auth.soleAuthorityCount, auth.authorityInfluenceScore ORDER BY auth.authorityInfluenceScore DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - authorityId
+    - authorityName
+    - authorityType
+    - soleAuthorityCount
+    - authorityInfluenceScore
+- id: enisa_subdomains
+  category: coverage
+  difficulty: easy
+  question: Which subdomains are under ENISA regulatory authority?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain) WHERE auth.authorityId = 'ENISA' RETURN sd.subDomainId, sd.name, sd.effectiveCoverage, sd.obligationUrgencyIndex ORDER BY sd.effectiveCoverage DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - subDomainId
+    - name
+    - effectiveCoverage
+    - obligationUrgencyIndex
+- id: authority_subdomain_count
+  category: coverage
+  difficulty: easy
+  question: How many sole-authority subdomains does each regulatory authority oversee?
+  expected_cypher: "MATCH (auth:RegulatoryAuthority)-[:UNDER_REGULATORY_AUTHORITY]->(sd:SubDomain) RETURN auth.authorityId, count(sd) AS subdomainCount ORDER BY subdomainCount DESC"
+  expected_result:
+    row_count: null
+    columns:
+    - authorityId
+    - subdomainCount

@@ -9,6 +9,9 @@ from aegis_agents.graph.prompts import get_prompt
 from aegis_agents.graph.state import AgentState
 from aegis_agents.tools.schema_tool import SCHEMA_DESCRIPTION
 from aegis_agents.tracing import log_generation
+from aegis_agents.circuit_breaker import neo4j_cb, CircuitOpenError
+from aegis_agents.query_linter import validate_cypher
+from aegis_agents.fallback_queries import find_fallback
 
 
 def extract_cypher(raw_output: str) -> str | None:
@@ -45,8 +48,19 @@ def extract_cypher(raw_output: str) -> str | None:
     return cypher
 
 
-def exec_cypher(statement: str, params: dict = None) -> dict:
-    """Execute Cypher against Neo4j and return results."""
+def exec_cypher(statement: str, params: dict = None, verbose: bool = False) -> dict:
+    """Execute Cypher against Neo4j with circuit breaker and linter."""
+    is_valid, reason = validate_cypher(statement)
+    if not is_valid:
+        if verbose:
+            print(f"[agent] Linter REJECTED: {reason}", flush=True)
+        return {"error": f"Query rejected: {reason}", "data": [], "row_count": 0}
+
+    if neo4j_cb.is_open:
+        if verbose:
+            print(f"[agent] Circuit breaker OPEN — Neo4j unavailable", flush=True)
+        return {"error": "Circuit breaker OPEN — Neo4j unavailable", "data": [], "row_count": 0}
+
     import requests as req
     from aegis_agents.config import NEO4J_CONFIG
 
@@ -55,8 +69,9 @@ def exec_cypher(statement: str, params: dict = None) -> dict:
     payload = {"statements": [{"statement": statement, "parameters": params or {}}]}
 
     try:
-        resp = req.post(url, auth=auth, json=payload, timeout=60)
+        resp = req.post(url, auth=auth, json=payload, timeout=10)
         if resp.status_code != 200:
+            neo4j_cb._on_failure()
             return {"error": f"HTTP {resp.status_code}", "data": [], "row_count": 0}
         result = resp.json()
         if result.get("errors"):
@@ -67,8 +82,10 @@ def exec_cypher(statement: str, params: dict = None) -> dict:
                 cols = res.get("columns", [])
                 for row in res["data"]:
                     rows.append(dict(zip(cols, row["row"])))
+        neo4j_cb._on_success()
         return {"error": None, "data": rows, "row_count": len(rows)}
     except Exception as e:
+        neo4j_cb._on_failure()
         return {"error": str(e), "data": [], "row_count": 0}
 
 
@@ -82,11 +99,43 @@ def generate_and_execute(state: AgentState) -> AgentState:
     attempt = state.get("attempt", 1)
     previous_cypher = state.get("cypher")
     previous_error = None
+    verbose = state.get("verbose", False)
 
     if state.get("steps"):
         last_step = state["steps"][-1]
         previous_error = last_step.get("error")
         previous_cypher = last_step.get("cypher")
+
+    if attempt >= state.get("max_attempts", 3):
+        fallback_cypher = find_fallback(question)
+        if fallback_cypher:
+            result = exec_cypher(fallback_cypher, verbose=verbose)
+            if result.get("row_count", 0) > 0:
+                if verbose:
+                    print(f"[agent] FALLBACK triggered: {fallback_cypher[:100]}", flush=True)
+                step = {
+                    "attempt": attempt,
+                    "cypher": fallback_cypher,
+                    "error": None,
+                    "data": result.get("data", []),
+                    "row_count": result.get("row_count", 0),
+                    "latency_ms": 0,
+                    "fallback": True,
+                }
+                log_generation(
+                    name="fallback_query",
+                    input_data={"question": question, "fallback": True},
+                    output_data={"cypher": fallback_cypher, "row_count": result.get("row_count", 0)},
+                    model="fallback-template",
+                    latency_ms=0,
+                    metadata={"attempt": attempt, "task": "fallback"}
+                )
+                return {
+                    "steps": state.get("steps", []) + [step],
+                    "attempt": attempt + 1,
+                    "cypher": fallback_cypher,
+                    "fallback_used": True,
+                }
 
     if attempt == 1:
         prompt = get_prompt("cypher_generation", schema=SCHEMA_DESCRIPTION, question=question)
@@ -98,6 +147,9 @@ def generate_and_execute(state: AgentState) -> AgentState:
             schema=SCHEMA_DESCRIPTION,
             question=question,
         )
+
+    if verbose:
+        print(f"[agent] Attempt {attempt}: Calling Ollama...", flush=True)
 
     url = f"{OLLAMA_CONFIG['base_url']}/api/generate"
     payload = {
@@ -113,6 +165,8 @@ def generate_and_execute(state: AgentState) -> AgentState:
         elapsed = (time.time() - start) * 1000
 
         if resp.status_code != 200:
+            if verbose:
+                print(f"[agent] Ollama HTTP {resp.status_code} ({elapsed/1000:.1f}s)", flush=True)
             step = {
                 "attempt": attempt,
                 "cypher": None,
@@ -128,6 +182,8 @@ def generate_and_execute(state: AgentState) -> AgentState:
 
         cypher = extract_cypher(raw)
         if not cypher:
+            if verbose:
+                print(f"[agent] Ollama FAILED: couldn't extract Cypher ({elapsed/1000:.1f}s)", flush=True)
             step = {
                 "attempt": attempt,
                 "cypher": raw[:200],
@@ -138,7 +194,13 @@ def generate_and_execute(state: AgentState) -> AgentState:
             }
             return {"steps": state.get("steps", []) + [step], "attempt": attempt + 1}
 
-        result = exec_cypher(cypher)
+        if verbose:
+            print(f"[agent] Ollama ({elapsed/1000:.1f}s): {cypher[:120]}", flush=True)
+
+        result = exec_cypher(cypher, verbose=verbose)
+        if verbose:
+            print(f"[agent] Cypher exec: rows={result.get('row_count', 0)}, error={result.get('error')}", flush=True)
+
         step = {
             "attempt": attempt,
             "cypher": cypher,
@@ -166,6 +228,8 @@ def generate_and_execute(state: AgentState) -> AgentState:
         return {"steps": state.get("steps", []) + [step], "attempt": attempt + 1, "cypher": cypher}
 
     except Exception as e:
+        if verbose:
+            print(f"[agent] Exception: {str(e)}", flush=True)
         step = {
             "attempt": attempt,
             "cypher": None,
@@ -186,8 +250,15 @@ def evaluate_and_decide(state: AgentState) -> AgentState:
     if not steps:
         return state
 
+    verbose = state.get("verbose", False)
     last_step = steps[-1]
     success = last_step.get("error") is None and last_step.get("row_count", 0) > 0
+    row_count = last_step.get("row_count", 0)
+
+    if verbose:
+        from aegis_agents.graph.router import should_continue
+        next_node = should_continue(state)
+        print(f"[agent] Decision: success={success}, rows={row_count} -> {next_node}", flush=True)
 
     return {"success": success}
 
@@ -200,6 +271,7 @@ def generate_answer(state: AgentState) -> AgentState:
     """
     question = state["question"]
     steps = state.get("steps", [])
+    verbose = state.get("verbose", False)
 
     best_step = None
     for step in reversed(steps):
@@ -219,6 +291,9 @@ def generate_answer(state: AgentState) -> AgentState:
     row_count = best_step.get("row_count", len(data))
     cypher = best_step.get("cypher", "N/A")
 
+    if verbose:
+        print(f"[agent] Generating answer from {row_count} rows...", flush=True)
+
     results_text = "\n".join(
         [", ".join(f"{k}={v}" for k, v in row.items() if v is not None) for row in data[:20]]
     )
@@ -236,12 +311,18 @@ def generate_answer(state: AgentState) -> AgentState:
     }
 
     try:
+        start = time.time()
         resp = requests.post(url, json=payload, timeout=OLLAMA_CONFIG["timeout"])
+        elapsed = (time.time() - start) * 1000
+
         if resp.status_code != 200:
             return {"answer": f"Error generating answer: Ollama HTTP {resp.status_code}"}
 
         data = resp.json()
         answer = data.get("response", "").strip()
+
+        if verbose:
+            print(f"[agent] Answer ({elapsed/1000:.1f}s): {answer[:150]}...", flush=True)
 
         # Log answer generation to Langfuse
         log_generation(

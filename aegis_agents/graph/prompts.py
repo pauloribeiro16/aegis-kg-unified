@@ -25,9 +25,9 @@ PROMPTS = {
 IMPORTANT RULES:
 1. Only output the Cypher query — no explanations, no markdown, no commentary.
 2. Use the schema provided. Node labels are: Regulation, Article, Clause, Domain, SubDomain, ComplementarityAnalysis, Framework, FrameworkCategory, FrameworkControl
-3. Relationship types: HAS_ARTICLE, HAS_CLAUSE, DEFINES, HAS_SUBDOMAIN, MAPPED_TO, OVERLAPS_WITH, HAS_CATEGORY, HAS_CONTROL, MAPS_TO_SUBDOMAIN, MAPS_TO_DOMAIN
+3. Relationship types: HAS_ARTICLE, HAS_CLAUSE, DEFINES, CONTAINS, MAPPED_TO, OVERLAPS_WITH, HAS_CATEGORY, HAS_CONTROL, MAPS_TO_SUBDOMAIN, MAPS_TO_DOMAIN
 4. Property names match exactly as defined in the schema.
-5. For the SubDomain ID format use 'D-01-1' (D-XX-Y with leading zeros dropped).
+5. For the SubDomain ID format use 'D-01.1' (DOT separator, D-XX.Y format).
 6. For clause IDs use format like 'GDPR-C01', 'CRA-C07', etc.
 7. For regulation IDs use 'GDPR', 'CRA', 'NIS2', 'DORA', 'AIAct'.
 8. If the question is ambiguous, pick the most logical interpretation.
@@ -44,7 +44,7 @@ MATCH (c:Clause) RETURN c.regulationId AS regulation, count(c) AS count ORDER BY
 MATCH (c:Clause {normativeIntensity: 3}) RETURN c.regulationId AS regulation, count(c) AS count ORDER BY count DESC
 
 // Average by group
-MATCH (d:Domain)-[:HAS_SUBDOMAIN]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
+MATCH (d:Domain)-[:CONTAINS]->(sd:SubDomain)<-[:MAPPED_TO]-(c:Clause)
 RETURN d.name AS domain, avg(c.normativeIntensity) AS avgNI ORDER BY avgNI DESC
 
 // Collect related items into list (with limit)
@@ -54,6 +54,29 @@ ORDER BY criticalCount DESC
 
 // Existence check (no rows = valid result, no retry needed)
 MATCH (sd:SubDomain) WHERE NOT EXISTS((:Clause)-[:MAPPED_TO]->(sd)) RETURN sd.subDomainId, sd.name
+
+## NIST CSF PATTERNS (CRITICAL — read carefully)
+
+FrameworkControl is filtered by PROPERTIES, NOT by traversing relationships to FrameworkCategory:
+- WRONG: MATCH (fc:FrameworkCategory)-[:HAS_CONTROL]->(FrameworkControl)
+- WRONG: MATCH (fc:FrameworkCategory)-[:HAS_CATEGORY]->(...)-[:HAS_CONTROL]->...
+- CORRECT: MATCH (fc:FrameworkControl {functionCode: 'PR'})   // filter by property
+- CORRECT: MATCH (fc:FrameworkControl {categoryId: 'PR.DS'})  // filter by property
+
+// List all NIST functions
+MATCH (fc:FrameworkCategory {type: 'FUNCTION'}) RETURN fc.categoryId, fc.name ORDER BY fc.categoryId
+
+// Controls per function (use functionCode property)
+MATCH (fc:FrameworkControl) RETURN fc.functionCode AS function, count(fc) AS controlCount ORDER BY controlCount DESC
+
+// Controls for a specific function (filter by functionCode property)
+MATCH (fc:FrameworkControl {functionCode: 'PR'}) RETURN fc.controlId, fc.title, fc.categoryId ORDER BY fc.controlId
+
+// Controls in a specific category (filter by categoryId property)
+MATCH (fc:FrameworkControl {categoryId: 'PR.DS'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
+
+// Controls mapping to a subdomain (use MAPS_TO_SUBDOMAIN relationship)
+MATCH (fc:FrameworkControl)-[:MAPS_TO_SUBDOMAIN]->(sd:SubDomain {subDomainId: 'D-01.1'}) RETURN fc.controlId, fc.title ORDER BY fc.controlId
 
 SCHEMA:
 {schema}
@@ -72,6 +95,8 @@ Never claim results are empty, missing, or that none exist when data is returned
 
 SCHEMA CONTEXT:
 - normativeIntensity: 1=MAY, 2=SHOULD, 3=SHALL
+- effectiveCoverage: float — SUM of normativeIntensity values of all clauses mapped to this SubDomain (NOT a ratio or percentage; higher = stronger regulatory pressure; range 0-114)
+- effectiveCoverageTier: 'HIGH' (>=8.0), 'MEDIUM' (>=4.0), 'LOW' (<4.0) — based on effectiveCoverage
 - obligationType: ONE_TIME, CONTINUOUS, TRIGGERED
 
 QUESTION: {question}

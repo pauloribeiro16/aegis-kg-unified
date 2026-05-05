@@ -390,6 +390,55 @@ temperature = 0.1
 
 ---
 
+## Minimax API URL - CRITICAL BUG (2026-05-04)
+
+**Symptom:** `status_code: 2049, status_msg: 'invalid api key'` despite correct API key
+**Root Cause:** URL was `https://api.minimax.chat/v1/text/chatcompletion_v2` (WRONG)
+**Correct URL:** `https://api.minimaxi.chat/v1/text/chatcompletion_v2` (note: minimaxi, not minimax)
+
+**Files affected:**
+- `aegis_eval/config.py` - MINIMAX["base_url"]
+- Any direct requests to Minimax API
+
+**Fix applied:**
+```python
+# WRONG (404 / 401 errors):
+MINIMAX["base_url"] = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+# CORRECT:
+MINIMAX["base_url"] = "https://api.minimaxi.chat/v1/text/chatcompletion_v2"
+```
+
+**Also fixed:**
+- `max_tokens` increased from 1024 to 4096 to prevent JSON truncation
+
+**Date:** 2026-05-04
+
+---
+
+## Minimax API Key Rotation (2026-05-04)
+
+**Old key (EXPOSED - DO NOT USE):**
+```
+sk-cp-yta9jJd1FoaX91wTwoVjoICfZm-wjFqKLccscXuVCdHp8huqOLAY_T6yScB3eO35cfxqBzXvlMYXfxQcPCOlDeBhkyTrMxGGwgv6UdICKK93Xi-_6dHubz4
+```
+
+**New key (ACTIVE):**
+```
+sk-cp-24bP-YWaZeAAxGreCrsknT1kugHnB2iJxcjJE7SgS65l-1Obghmn9_g_KSeNXtnUFaaMk37leZT84vW3EQd0CWo_fJuT9XaOfA0laK6GFJQKnshmT5MYWhg
+```
+
+**Files updated:**
+- `/home/epmq/Desktop/Projects/aegis-kg-unified/.env`
+- `/home/epmq/Desktop/Projects/Methodology-main/.env`
+- `/home/epmq/Desktop/Projects/artigos-lc/.env`
+- `/home/epmq/Desktop/Projects/aegis-kg-unified-BACKUP-20260429/.env.example`
+- `/home/epmq/Desktop/Projects/aegis-kg-unified-BACKUP-20260429/MEMORY.md`
+
+**Date:** 2026-05-04
+
+---
+
 ## Implementation Errors (2026-04-28)
 
 ### Error 1: Minimax API Key Invalid
@@ -593,3 +642,28 @@ agent_eval_{task_id} (L0 — CallbackHandler)
 - Container running normally
 
 **Next step:** Run a task and verify traces appear in Langfuse UI at http://localhost:3000
+
+---
+
+## Minimax LangChain vs Direct Requests - 2026-05-04
+
+### Error: LangChain MiniMaxChat fails with "Invalid API Key Provided"
+**Symptom:** `Invalid API Key Provided` when using LangChain `MiniMaxChat`, but direct `requests.post` works fine with the same API key.
+
+**Root Cause:** LangChain `MiniMaxChat` uses a cached HTTP client (`httpx.Client`) inside `_generate()`. On some environments, the client instance may not properly send the Authorization header despite the key being set correctly in `MiniMaxChat.minimax_api_key`. The direct HTTP request via `requests.post` always works.
+
+**Debug findings:**
+- API key length: 125 chars (correct)
+- Host: `https://api.minimaxi.chat/v1/text/chatcompletion_v2` (correct)
+- Direct `requests.post` with same key/headers: ✅ Works
+- LangChain `MiniMaxChat.invoke()`: ❌ `Invalid API Key Provided` after 0.7-1.2s
+
+**Solution:** Replaced LangChain `MiniMaxChat` with direct `requests.post` in `aegis_eval/minimax_client.py`. Direct HTTP is more reliable and has fewer dependencies.
+
+**Changes:**
+- `aegis_eval/minimax_client.py` - Complete rewrite using `requests.post` instead of `langchain_community.chat_models.MiniMaxChat`
+- Uses `https://api.minimaxi.chat/v1/text/chatcompletion_v2` directly
+- Model name: `MiniMax-M2.7` (case sensitive)
+- `max_tokens=4096`, `temperature=0.1`, `top_p=0.95`
+
+**Date:** 2026-05-04

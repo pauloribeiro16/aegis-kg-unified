@@ -70,6 +70,7 @@ def judge_agent_result(task: dict, agent_result: dict) -> dict:
         }
     """
     dimensions = get_dimension_names()
+    verbose = agent_result.get("_verbose", False)
 
     # Check if Minimax is configured
     if not MINIMAX.get("api_key"):
@@ -77,6 +78,11 @@ def judge_agent_result(task: dict, agent_result: dict) -> dict:
 
     # Build the evaluation prompt
     system_prompt, user_prompt = get_evaluation_prompt(task, agent_result)
+
+    if verbose:
+        import os
+        print(f"[judge] Calling Minimax M2.7 (prompt: {len(user_prompt)} chars)...", flush=True)
+        print(f"[DEBUG] judge_agent_result: MINIMAX api_key len={len(MINIMAX.get('api_key', ''))}, os.getenv len={len(os.getenv('MINIMAX_API_KEY', ''))}", flush=True)
 
     # Call Minimax
     start = time.time()
@@ -87,14 +93,21 @@ def judge_agent_result(task: dict, agent_result: dict) -> dict:
     latency_ms = (time.time() - start) * 1000
 
     if result["error"]:
+        if verbose:
+            print(f"[judge] Minimax error ({latency_ms/1000:.1f}s): {result['error']}", flush=True)
         return _error_result(result["error"], dimensions, latency_ms)
 
     raw_content = result["content"].strip()
+
+    if verbose:
+        print(f"[judge] Response ({latency_ms/1000:.1f}s): {raw_content[:200]}", flush=True)
 
     # Parse the JSON response
     parsed = _parse_json_response(raw_content, dimensions)
 
     if parsed is None:
+        if verbose:
+            print(f"[judge] PARSE FAILED: {raw_content[:300]}", flush=True)
         return {
             'scores': _default_scores(dimensions),
             'reasoning': {},
@@ -105,6 +118,14 @@ def judge_agent_result(task: dict, agent_result: dict) -> dict:
 
     # Extract scores and reasoning
     scores, reasoning, avg_scores = _extract_scores_and_reasoning(parsed, dimensions)
+
+    if verbose:
+        cyph = scores.get('cypher_correctness_query', 0)
+        quer = scores.get('query_effectiveness_query', 0)
+        feed = scores.get('feedback_loop_benefit_query', 0)
+        tool = scores.get('tool_usage_query', 0)
+        reas = scores.get('reasoning_quality_query', 0)
+        print(f"[judge] Scores: cyph={cyph} quer={quer} feed={feed} tool={tool} reas={reas}", flush=True)
 
     return {
         'scores': scores,
@@ -166,8 +187,8 @@ def _extract_scores_and_reasoning(parsed: dict, dimensions: list[str]) -> tuple[
     return scores, reasoning, avg_scores
 
 
-def _clamp_score(val, default: int = 3) -> int:
-    """Clamp score to 1-5 range."""
+def _clamp_score(val, default: int = 0) -> int:
+    """Clamp score to 1-5 range. Default 0 indicates failure."""
     try:
         v = int(val)
         return max(1, min(5, v))
@@ -176,11 +197,11 @@ def _clamp_score(val, default: int = 3) -> int:
 
 
 def _default_scores(dimensions: list[str]) -> dict:
-    """Return default scores structure."""
+    """Return default scores structure — 0 indicates failure."""
     scores = {}
     for dim in dimensions:
-        scores[f"{dim}_query"] = 3
-        scores[f"{dim}_answer"] = 3
+        scores[f"{dim}_query"] = 0
+        scores[f"{dim}_answer"] = 0
     return scores
 
 

@@ -1,31 +1,24 @@
 #!/usr/bin/env python3
 """
-minimax_client.py — Minimax API client using LangChain MiniMaxChat.
-
-Usage:
-    from minimax_client import call_minimax
-
-    response = call_minimax(
-        messages=[{"role": "user", "content": "Your prompt here"}],
-        system="Optional system prompt"
-    )
+minimax_client.py — Minimax API client using direct requests (no LangChain dependency).
 """
 
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
-from langchain_community.chat_models import MiniMaxChat
-from langchain_core.messages import HumanMessage, SystemMessage
+import requests
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 
-def get_minimax_llm(temperature: float = 0.1, max_tokens: int = 4096) -> MiniMaxChat:
-    """Get or create a MiniMaxChat instance."""
-    return MiniMaxChat(
-        model="MiniMax-M2.7",
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
+MINIMAX_API_URL = "https://api.minimaxi.chat/v1/text/chatcompletion_v2"
+MINIMAX_MODEL = "MiniMax-M2.7"
+
+_env_key = os.getenv("MINIMAX_API_KEY", "")
+print(f"  [DEBUG minimax_client MODULE LOAD] MINIMAX_API_KEY first20={_env_key[:20]}... len={len(_env_key)}", flush=True)
 
 
 def call_minimax(
@@ -35,105 +28,85 @@ def call_minimax(
     max_tokens: int = 4096,
 ) -> dict:
     """
-    Call Minimax API via LangChain MiniMaxChat.
-
-    Args:
-        messages: List of message dicts with 'role' and 'content'
-        system: Optional system prompt
-        temperature: Override default temperature
-        max_tokens: Override default max_tokens
-
-    Returns:
-        {
-            "content": str,  # Response text
-            "latency_ms": float,
-            "error": str or None,
-            "usage": dict  # Token usage info
-        }
+    Call Minimax API via direct HTTP requests.
     """
     api_key = os.getenv("MINIMAX_API_KEY", "")
     if not api_key:
-        return {
-            "content": "",
-            "latency_ms": 0,
-            "error": "MINIMAX_API_KEY not configured",
-            "usage": {}
-        }
+        return {"content": "", "latency_ms": 0, "error": "MINIMAX_API_KEY not configured", "usage": {}}
 
+    print(f"  [DEBUG] call_minimax: key_first20={api_key[:20]}... len={len(api_key)}, url={MINIMAX_API_URL}", flush=True)
+
+    api_messages = []
+    if system:
+        api_messages.append({"role": "system", "content": system})
+    for msg in messages:
+        api_messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+
+    payload = {
+        "model": MINIMAX_MODEL,
+        "messages": api_messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "top_p": 0.95,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    print(f"  [DEBUG] call_minimax: Authorization header set, Bearer prefix=sk-cp-{api_key[6:15]}...", flush=True)
+
+    start = time.time()
     try:
-        llm = get_minimax_llm(temperature=temperature, max_tokens=max_tokens)
-
-        # Build LangChain messages
-        langchain_messages = []
-        if system:
-            langchain_messages.append(SystemMessage(content=system))
-
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if role == "system":
-                langchain_messages.append(SystemMessage(content=content))
-            elif role == "user":
-                langchain_messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                from langchain_core.messages import AIMessage
-                langchain_messages.append(AIMessage(content=content))
-
-        start = time.time()
-        response = llm.invoke(langchain_messages)
+        resp = requests.post(MINIMAX_API_URL, json=payload, headers=headers, timeout=60)
         elapsed = (time.time() - start) * 1000
 
-        # Extract content
-        if hasattr(response, "content"):
-            content = response.content
-        else:
-            content = str(response)
+        print(f"  [DEBUG] call_minimax: HTTP {resp.status_code}, body_len={len(resp.text)}", flush=True)
+        print(f"  [DEBUG] call_minimax: response_body={resp.text[:300]}", flush=True)
 
-        # Extract usage from metadata
-        usage = {}
-        if hasattr(response, "response_metadata"):
-            usage = response.response_metadata.get("token_usage", {})
+        if resp.status_code != 200:
+            return {"content": "", "latency_ms": elapsed, "error": f"HTTP {resp.status_code}: {resp.text[:500]}", "usage": {}}
 
-        return {
-            "content": content,
-            "latency_ms": elapsed,
-            "error": None,
-            "usage": usage
-        }
+        data = resp.json()
 
+        base_resp = data.get("base_resp", {})
+        if base_resp.get("status_code", 0) != 0:
+            status_msg = base_resp.get("status_msg", "unknown error")
+            return {"content": "", "latency_ms": elapsed, "error": f"API error {base_resp.get('status_code')}: {status_msg}", "usage": {}}
+
+        choices = data.get("choices", [])
+        content = choices[0].get("message", {}).get("content", "") if choices else ""
+        usage = data.get("usage", {})
+
+        return {"content": content, "latency_ms": elapsed, "error": None, "usage": usage}
+
+    except requests.exceptions.Timeout:
+        return {"content": "", "latency_ms": (time.time() - start) * 1000, "error": "Request timed out", "usage": {}}
+    except requests.exceptions.RequestException as e:
+        return {"content": "", "latency_ms": (time.time() - start) * 1000, "error": f"Request failed: {str(e)}", "usage": {}}
     except Exception as e:
-        return {
-            "content": "",
-            "latency_ms": 0,
-            "error": str(e),
-            "usage": {}
-        }
+        import traceback
+        tb = traceback.format_exc()
+        print(f"  [DEBUG] Minimax exception: {e}", flush=True)
+        print(f"  [DEBUG] Traceback:\n{tb}", flush=True)
+        return {"content": "", "latency_ms": 0, "error": str(e), "usage": {}}
 
 
 def call_minimax_simple(prompt: str, system: str = "", temperature: float = 0.1) -> dict:
-    """
-    Simple single-prompt interface for Minimax.
-
-    Args:
-        prompt: User prompt text
-        system: Optional system prompt
-        temperature: Temperature for generation
-
-    Returns:
-        Same as call_minimax
-    """
+    """Simple single-prompt interface for Minimax."""
     messages = [{"role": "user", "content": prompt}]
     return call_minimax(messages, system=system, temperature=temperature)
 
 
 if __name__ == "__main__":
-    print("Testing Minimax client via LangChain...")
+    print("Testing Minimax client via direct requests...")
 
     if not os.getenv("MINIMAX_API_KEY"):
         print("WARNING: MINIMAX_API_KEY not set")
     else:
         result = call_minimax_simple(
-            prompt="Say 'Hello from Minimax via LangChain' in exactly those words.",
+            prompt="Say 'Hello from Minimax direct' in exactly those words.",
             system="You are a helpful assistant."
         )
         print(f"Response: {result['content']}")

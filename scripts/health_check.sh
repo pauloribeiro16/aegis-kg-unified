@@ -33,13 +33,32 @@ warn() {
     echo -e "${YELLOW}⚠ WARN: $1${NC}"
 }
 
+if [ -f ".env" ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+export NEO4J_URI="${NEO4J_URI:-http://localhost:7474}"
+export NEO4J_USER="${NEO4J_USER:-neo4j}"
+export NEO4J_PASSWORD="${NEO4J_PASSWORD}"
+export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
+export OLLAMA_MODEL="${OLLAMA_MODEL:-ministral-3:latest}"
+export LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY}"
+export LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY}"
+export LANGFUSE_BASE_URL="${LANGFUSE_BASE_URL:-http://localhost:3000}"
+export MINIMAX_API_KEY="${MINIMAX_API_KEY}"
+
+if [ -z "$NEO4J_PASSWORD" ]; then
+    echo -e "${RED}✗ NEO4J_PASSWORD not set. Check .env file.${NC}"
+    exit 1
+fi
+
 # ============================================
 echo "=== AEGIS KG Health Check ==="
 echo ""
 
 # 1. Neo4j
 log "Checking Neo4j..."
-if curl -s -u neo4j:d3fendtest http://localhost:7474/db/neo4j/tx/commit -H "Content-Type: application/json" -d '{"statements":[{"statement":"RETURN 1"}]' > /dev/null 2>&1; then
+if curl -s -u neo4j:"$NEO4J_PASSWORD" "$NEO4J_URI/db/neo4j/tx/commit" -H "Content-Type: application/json" -d '{"statements":[{"statement":"RETURN 1"}]' > /dev/null 2>&1; then
     pass "Neo4j is running"
 else
     fail "Neo4j is not accessible"
@@ -47,7 +66,7 @@ fi
 
 # 2. Ollama
 log "Checking Ollama..."
-if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+if curl -s "$OLLAMA_BASE_URL/api/tags" > /dev/null 2>&1; then
     pass "Ollama is running"
 else
     fail "Ollama is not accessible"
@@ -55,7 +74,7 @@ fi
 
 # 3. Langfuse
 log "Checking Langfuse..."
-if curl -s http://localhost:3000 > /dev/null 2>&1; then
+if curl -s "$LANGFUSE_BASE_URL" > /dev/null 2>&1; then
     pass "Langfuse is running"
 else
     warn "Langfuse is not accessible (tracing may fail)"
@@ -72,15 +91,6 @@ fi
 # 5. Smoke test (1 task)
 log "Running smoke test..."
 source /home/epmq/Desktop/Projects/shared-venv/bin/activate > /dev/null 2>&1
-export NEO4J_URI=http://localhost:7474
-export NEO4J_USER=neo4j
-export NEO4J_PASSWORD=d3fendtest
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=ministral-3:latest
-export LANGFUSE_PUBLIC_KEY=pk-lf-ea927dac-58fd-48f5-b98e-1eaf0aeab892
-export LANGFUSE_SECRET_KEY=sk-lf-5b2e0db7-d911-444f-9971-3f5699147ac7
-export LANGFUSE_BASE_URL=http://localhost:3000
-export MINIMAX_API_KEY=sk-cp-yta9jJd1FoaX91wTwoVjoICfZm-wjFqKLccscXuVCdHp8huqOLAY_T6yScB3eO35cfxqBzXvlMYXfxQcPCOlDeBhkyTrMxGGwgv6UdICKK93Xi-_6dHubz4
 
 cd /home/epmq/Desktop/Projects/aegis-kg-unified
 PYTHONPATH=. python3 aegis_eval/run_eval.py --tasks aegis_eval/task_bank.yaml --task list_all_regulations --trials 1 --verbose > /tmp/smoke_test.log 2>&1

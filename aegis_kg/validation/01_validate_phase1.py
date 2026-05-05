@@ -8,9 +8,12 @@ import os
 import sys
 import time
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 NEO4J_HTTP = "http://localhost:7474"
-AUTH = (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "neo4j_password"))
+AUTH = (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "d3fendtest"))
 
 def exec_cypher_batch(statements, retries=5):
     """Execute multiple Cypher statements in a single request"""

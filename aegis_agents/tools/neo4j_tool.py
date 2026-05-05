@@ -118,7 +118,7 @@ IMPORTANT RULES:
 2. Use the schema provided. Node labels are: Regulation, Article, Clause, Domain, SubDomain, ComplementarityAnalysis, Framework, FrameworkCategory, FrameworkControl
 3. Relationship types: HAS_ARTICLE, HAS_CLAUSE, DEFINES, HAS_SUBDOMAIN, MAPPED_TO, OVERLAPS_WITH, HAS_CATEGORY, HAS_CONTROL, MAPS_TO_SUBDOMAIN, MAPS_TO_DOMAIN
 4. Property names match exactly as defined in the schema.
-5. For the SubDomain ID format use 'D-01-1' (D-XX-Y with leading zeros dropped).
+5. For the SubDomain ID format use 'D-01.1' (DOT separator, D-XX.Y format).
 6. For clause IDs use format like 'GDPR-C01', 'CRA-C07', etc.
 7. For regulation IDs use 'GDPR', 'CRA', 'NIS2', 'DORA', 'AIAct'.
 8. If the question is ambiguous, pick the most logical interpretation.

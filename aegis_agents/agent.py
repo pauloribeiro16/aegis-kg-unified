@@ -49,9 +49,10 @@ def build_agent_graph():
 class AegisAgent:
     """LangGraph ReAct agent for AEGIS KG with feedback loops."""
 
-    def __init__(self, max_attempts: int = 3, use_tracing: bool = True):
+    def __init__(self, max_attempts: int = 3, use_tracing: bool = True, verbose: bool = False):
         self.max_attempts = max_attempts
         self.use_tracing = use_tracing
+        self.verbose = verbose
 
         self.langfuse_handler = None
         self.langfuse = None
@@ -62,8 +63,82 @@ class AegisAgent:
 
         self.graph = build_agent_graph()
 
+    def _check_neo4j(self) -> bool:
+        """Check if Neo4j is reachable."""
+        try:
+            from aegis_agents.config import NEO4J_CONFIG
+            import requests as req
+            r = req.get(NEO4J_CONFIG["http_url"], auth=(NEO4J_CONFIG["user"], NEO4J_CONFIG["password"]), timeout=3)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    def _check_ollama(self) -> bool:
+        """Check if Ollama is reachable."""
+        try:
+            from aegis_agents.config import OLLAMA_CONFIG
+            import requests as req
+            r = req.get(f"{OLLAMA_CONFIG['base_url']}/api/tags", timeout=3)
+            return r.status_code == 200
+        except Exception:
+            return False
+
     def run(self, question: str) -> dict:
         """Run the agent with feedback loop."""
+        neo4j_ok = self._check_neo4j()
+        ollama_ok = self._check_ollama()
+
+        if self.verbose:
+            print(f"[agent] Pre-flight: Neo4j={'OK' if neo4j_ok else 'DOWN'}, Ollama={'OK' if ollama_ok else 'DOWN'}", flush=True)
+
+        if not neo4j_ok and not ollama_ok:
+            if self.verbose:
+                print(f"[agent] FATAL: Both Neo4j and Ollama unavailable", flush=True)
+            return {
+                "answer": "Both Neo4j and Ollama are unavailable. Please check infrastructure (docker ps, curl localhost:7474, curl localhost:11434).",
+                "cypher": None,
+                "steps": [],
+                "success": False,
+                "attempt_count": 0,
+                "trace_id": None,
+                "degraded_mode": True,
+            }
+
+        if not ollama_ok:
+            if self.verbose:
+                print(f"[agent] DEGRADED MODE: Ollama unavailable, trying fallback...", flush=True)
+            from aegis_agents.fallback_queries import find_fallback
+            from aegis_agents.graph.nodes import exec_cypher
+            fallback_cypher = find_fallback(question)
+            if fallback_cypher:
+                result = exec_cypher(fallback_cypher, verbose=self.verbose)
+                if result.get("error") is None:
+                    if self.verbose:
+                        print(f"[agent] FALLBACK used: {fallback_cypher[:100]}", flush=True)
+                    data = result.get("data", [])
+                    answer = "\n".join(
+                        [", ".join(f"{k}={v}" for k, v in row.items() if v is not None) for row in data[:20]]
+                    )
+                    return {
+                        "answer": f"[Fallback mode — Ollama unavailable]\n{answer}",
+                        "cypher": fallback_cypher,
+                        "steps": [{"attempt": 1, "cypher": fallback_cypher, "error": None, "data": data, "row_count": len(data), "fallback": True}],
+                        "success": True,
+                        "attempt_count": 1,
+                        "trace_id": None,
+                        "fallback_used": True,
+                        "degraded_mode": True,
+                    }
+            return {
+                "answer": "Ollama is unavailable and no fallback query matches this question. Please start Ollama.",
+                "cypher": None,
+                "steps": [],
+                "success": False,
+                "attempt_count": 0,
+                "trace_id": None,
+                "degraded_mode": True,
+            }
+
         initial_state: AgentState = {
             "messages": [],
             "question": question,
@@ -74,6 +149,7 @@ class AegisAgent:
             "answer": None,
             "success": False,
             "steps": [],
+            "verbose": self.verbose,
         }
 
         config = {}
@@ -112,9 +188,9 @@ class AegisAgent:
         }
 
 
-def run_agent(question: str, max_attempts: int = 3) -> dict:
+def run_agent(question: str, max_attempts: int = 3, verbose: bool = False) -> dict:
     """Convenience function to run the agent."""
-    agent = AegisAgent(max_attempts=max_attempts, use_tracing=False)
+    agent = AegisAgent(max_attempts=max_attempts, use_tracing=False, verbose=verbose)
     return agent.run(question)
 
 
