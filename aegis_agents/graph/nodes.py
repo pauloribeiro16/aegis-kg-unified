@@ -15,36 +15,61 @@ from aegis_agents.fallback_queries import find_fallback
 
 
 def extract_cypher(raw_output: str) -> str | None:
-    """Extract the first valid Cypher statement from LLM output."""
+    """Extract the first valid Cypher statement from LLM output.
+
+    ministral-3 produces explanatory text alongside Cypher. This function:
+    1. Strips think tags and markdown fences
+    2. Finds the first line starting with a Cypher keyword
+    3. Collects subsequent lines that are pure Cypher (no normal English sentences)
+    4. Stops when a line contains common English explanation patterns
+    """
+    raw_output = re.sub(r"<think[\s\S]*?</think\s*>", "", raw_output, flags=re.IGNORECASE)
     raw_output = raw_output.strip()
+
     raw_output = re.sub(r"```cypher\s*", "", raw_output, flags=re.IGNORECASE)
     raw_output = re.sub(r"```\s*", "", raw_output)
-    raw_output = raw_output.strip("`").strip()
 
-    lines = raw_output.strip().split("\n")
+    ENGLISH_STOP = re.compile(
+        r'\b(This query|will return|provides|gives you|shows|you can use|'
+        r'count of|number of|all distinct|if you want|based on your|'
+        r'in the graph|alternatively|for example|to get the|'
+        r'which means|here is|layout)\b',
+        re.IGNORECASE
+    )
+
+    lines = raw_output.split("\n")
     cypher_lines = []
-    in_cypher = False
+    found_start = False
 
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("MATCH") or stripped.startswith("RETURN") or \
-           stripped.startswith("CREATE") or stripped.startswith("MERGE") or \
-           stripped.startswith("WITH") or stripped.startswith("UNWIND"):
-            in_cypher = True
-        if in_cypher:
-            cypher_lines.append(stripped)
-            if ";" in line:
+        if not stripped:
+            continue
+        if not found_start:
+            if re.match(r'^\s*(MATCH|RETURN|CREATE|MERGE|WITH|UNWIND)\b', stripped, re.IGNORECASE):
+                found_start = True
+                cypher_lines.append(stripped)
+        else:
+            if ENGLISH_STOP.search(stripped):
                 break
+            cypher_lines.append(stripped)
+            if stripped.endswith(";"):
+                break
+
+    if not cypher_lines:
+        return None
 
     cypher = " ".join(cypher_lines)
     cypher = re.sub(r"`+", "", cypher)
     cypher = cypher.strip()
+
     if not cypher or len(cypher) < 10:
         return None
     if "MATCH" not in cypher and "RETURN" not in cypher:
         return None
-    if ";" not in cypher:
+    if not cypher.endswith(";"):
         cypher += ";"
+
     return cypher
 
 
@@ -155,8 +180,9 @@ def generate_and_execute(state: AgentState) -> AgentState:
     payload = {
         "model": OLLAMA_CONFIG["model"],
         "prompt": prompt,
+        "system": "You are a Neo4j Cypher query generator. Output ONLY the Cypher query. No explanations, no markdown, no commentary. Start with MATCH.",
         "stream": False,
-        "options": {"temperature": 0.1, "num_predict": 512}
+        "options": {"temperature": 0.1, "num_predict": 2500}
     }
 
     start = time.time()
